@@ -1,4 +1,4 @@
-package eu.h2020.symbiote.elgrc;
+package eu.h2020.symbiote.smeur.elgrc;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
