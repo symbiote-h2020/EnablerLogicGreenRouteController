@@ -1,21 +1,19 @@
 package eu.h2020.symbiote.smeur.elgrc.model;
 
+import eu.h2020.symbiote.smeur.StreetSegmentList;
+
 public class AirQualityUpdateMessage {
-	private String request;
+	private StreetSegmentList theList;
 
     public AirQualityUpdateMessage() {
     }
-    
-    public AirQualityUpdateMessage(String request) {
-        this.setRequest(request);
-    }
 
-	public String getRequest() {
-		return request;
+	public StreetSegmentList getTheList() {
+		return theList;
 	}
 
-	public void setRequest(String request) {
-		this.request = request;
+	public void setTheList(StreetSegmentList theList) {
+		this.theList = theList;
 	}
     
 }

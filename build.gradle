@@ -86,6 +86,7 @@ dependencies {
     compile('org.springframework.boot:spring-boot-starter-data-mongodb')
     
     compile('com.github.symbiote-h2020:EnablerLogic:develop-SNAPSHOT')
+    compile('com.github.symbiote-h2020:SMEURLibraries:develop-SNAPSHOT')
     // from local maven repository
     //compile('eu.h2020.symbiote:EnablerLogic:0.0.1-SNAPSHOT')
 
