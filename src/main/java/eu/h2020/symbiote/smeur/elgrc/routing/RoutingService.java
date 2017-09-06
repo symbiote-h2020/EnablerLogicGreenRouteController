@@ -6,13 +6,13 @@ public class RoutingService {
 
 	private boolean isExternal;
 	private String name;
-	private ArrayList<String> locations;
+	private ArrayList<Region> locations;
 	
 	public RoutingService() {
-		this.setLocations(new ArrayList<String>());
+		this.setLocations(new ArrayList<Region>());
 	}
 	
-	public RoutingService(boolean isExternal, String name, ArrayList<String> locations) {
+	public RoutingService(boolean isExternal, String name, ArrayList<Region> locations) {
 		this.setExternal(isExternal);
 		this.setName(name);
 		this.setLocations(locations);
@@ -34,12 +34,16 @@ public class RoutingService {
 		this.name = name;
 	}
 
-	public ArrayList<String> getLocations() {
+	public ArrayList<Region> getLocations() {
 		return locations;
 	}
 
-	public void setLocations(ArrayList<String> locations) {
+	public void setLocations(ArrayList<Region> locations) {
 		this.locations = locations;
+	}
+	
+	public void appenLocation(Region location) {
+		this.locations.add(location);
 	}
 	
 }
