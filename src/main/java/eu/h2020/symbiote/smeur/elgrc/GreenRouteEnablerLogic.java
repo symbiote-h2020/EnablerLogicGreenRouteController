@@ -12,8 +12,8 @@ import eu.h2020.symbiote.enablerlogic.EnablerLogic;
 import eu.h2020.symbiote.enablerlogic.ProcessingLogic;
 import eu.h2020.symbiote.smeur.messages.QueryInterpolatedStreetSegmentList;
 import eu.h2020.symbiote.smeur.messages.QueryInterpolatedStreetSegmentListResponse;
-import eu.h2020.symbiote.smeur.messages.RegisterInterpolationConsumer;
-import eu.h2020.symbiote.smeur.messages.RegisterInterpolationConsumerResponse;
+import eu.h2020.symbiote.smeur.messages.RegisterRegion;
+import eu.h2020.symbiote.smeur.messages.RegisterRegionResponse;
 import eu.h2020.symbiote.smeur.StreetSegmentList;
 import eu.h2020.symbiote.smeur.elgrc.model.AirQualityUpdateMessage;
 import eu.h2020.symbiote.smeur.elgrc.model.RouteRequest;
@@ -29,28 +29,23 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 
 	private ArrayList<Region> registeredRegions;
 	private ArrayList<RoutingService> registeredRoutingServices;
-	
+
 	@Value("${routing.regions}")
 	String regions;
-	
 	@Value("${routing.regions.files}")
 	String regionsFiles;
-	
 	@Value("${routing.services}")
 	String services;
-	
 	@Value("${routing.services.preferences}")
 	String servicesPreferences;
-	
 	@Value("${routing.services.isexternal}")
 	String servicesIsExternal;
-	
 
 	@Override
 	public void initialization(EnablerLogic enablerLogic) {
 		this.enablerLogic = enablerLogic;
-		this.registeredRoutingServices = new ArrayList<RoutingService>();
 		this.registeredRegions = new ArrayList<Region>();
+		this.registeredRoutingServices = new ArrayList<RoutingService>();
 
 		// do stuff
 		buildServicesStructures();
@@ -64,19 +59,20 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	public void measurementReceived(EnablerLogicDataAppearedMessage dataAppeared) {
 		System.out.println("received new Observations:\n" + dataAppeared);
 	}
-	
+
 	/**
-	 * Method to create a structure of registered regions and services from bootstrp.properties
+	 * Method to create a structure of registered regions and services from
+	 * bootstrp.properties
 	 */
 	private void buildServicesStructures() {
 		String[] regionsArray = this.regions.split(";");
 		String[] regionsFiles = this.regionsFiles.split(";");
-		for (int i = 0; i < regionsArray.length; i++) 
+		for (int i = 0; i < regionsArray.length; i++)
 			registeredRegions.add(new Region(regionsArray[i], regionsFiles[i]));
-		
+
 		/*
-		 * This part could probably be made more efficient with the use of hashmaps, 
-		 * but it shouldn't be an issue, because there probably won't be that many services.
+		 * This part could probably be made more efficient with the use of hashmaps, but
+		 * it shouldn't be an issue, because there probably won't be that many services.
 		 */
 		String[] servicesArray = this.services.split(";");
 		String[] servicesPreferences = this.servicesPreferences.split(";");
@@ -85,7 +81,7 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 			RoutingService newService = new RoutingService();
 			newService.setName(servicesArray[i]);
 			newService.setExternal(Boolean.parseBoolean(servicesIsExternal[i]));
-			
+
 			String[] servicePreferences = servicesPreferences[i].split(",");
 			for (int j = 0; j < servicePreferences.length; j++) {
 				for (Region region : this.registeredRegions) {
@@ -95,10 +91,9 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 					}
 				}
 			}
-			
+
 			this.registeredRoutingServices.add(newService);
 		}
-		
 	}
 
 	/**
@@ -106,27 +101,30 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	 */
 	private void registerWithInterpolator() {
 		for (Region region : this.registeredRegions) {
-			RegisterInterpolationConsumer registrationMessage = buildRegistrationMessage(region);
-	
-			RegisterInterpolationConsumerResponse response = enablerLogic.sendSyncMessageToEnablerLogic(
-					"EnablerLogicInterpolator", registrationMessage, RegisterInterpolationConsumerResponse.class);
-			if (response.status != RegisterInterpolationConsumerResponse.StatusCode.SUCCESS) {
-				//TODO check not success
+			RegisterRegion registrationMessage = buildRegistrationMessage(region);
+
+			RegisterRegionResponse response = enablerLogic.sendSyncMessageToEnablerLogic("EnablerLogicInterpolator",
+					registrationMessage, RegisterRegionResponse.class);
+			if (response.status != RegisterRegionResponse.StatusCode.SUCCESS) {
+				// TODO check not success
 				;
 			}
 		}
-		
+
 	}
 
 	/**
 	 * Method that builds the message to send to the interpolator
-	 * @param region The region that contains the streetsegments
+	 * 
+	 * @param region
+	 *            The region that contains the streetsegments
 	 * @return the message to be sent
 	 */
-	private RegisterInterpolationConsumer buildRegistrationMessage(Region region) {
+	private RegisterRegion buildRegistrationMessage(Region region) {
+		log.info("Loading Street Data Information");
 		// TODO get streetsegments from file in region.file
-		RegisterInterpolationConsumer registrationMessage = new RegisterInterpolationConsumer();
-		registrationMessage.consumerID = region.getName();
+		RegisterRegion registrationMessage = new RegisterRegion();
+		registrationMessage.regionID = region.getName();
 		return registrationMessage;
 	}
 
@@ -150,54 +148,69 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	 */
 	private void requestAirQualityData() {
 		for (Region region : this.registeredRegions) {
+			log.info("Requesting data from " + region.getName());
 			QueryInterpolatedStreetSegmentList interpolatedRequest = new QueryInterpolatedStreetSegmentList();
 			interpolatedRequest.sslID = region.getName();
 			QueryInterpolatedStreetSegmentListResponse response = enablerLogic.sendSyncMessageToEnablerLogic(
-					"EnablerLogicInterpolator", interpolatedRequest,
-					QueryInterpolatedStreetSegmentListResponse.class);
-	
+					"EnablerLogicInterpolator", interpolatedRequest, QueryInterpolatedStreetSegmentListResponse.class);
+
+			log.info("Received data from " + region.getName());
 			StreetSegmentList streetSegments = response.theList;
-	
+
 			for (RoutingService rs : this.registeredRoutingServices) {
 				for (Region serviceRegion : rs.getLocations()) {
 					if (serviceRegion.getName().equals(region.getName())) {
 						if (rs.isExternal()) {
-							// TODO send street segments to service (REST)
-							// TODO send qir quality data to service (REST)
+							log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to "
+									+ rs.getName() + " through REST");
+							// TODO send street segments and qir quality to service (REST)
 						} else {
-							// TODO send street segments to PP (Rabbit)
-							// TODO send qir quality data to PP (Rabbit)
+							log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to "
+									+ rs.getName() + " through Rabbit");
+							// TODO send street segments and qir quality to PP (Rabbit)
 						}
 						break;
 					}
-				}	
+				}
 			}
 		}
 	}
 
 	/**
-	 * COnsumes air quality data updates and sendds them to whoever wants it
+	 * Consumes air quality data updates and sends them to whoever wants it
+	 * 
 	 * @param m
 	 */
 	private void airQualityUpdatesConsumer(AirQualityUpdateMessage m) {
-		//Should be similar to requestAirQualityData
-		// TODO incoming to be sent to services that want them
+		log.info("Received data from " + m.getRegionID());
+		// Should be similar to requestAirQualityData
 		for (RoutingService rs : this.registeredRoutingServices) {
-			// TODO check if service wants this data
-			if (rs.isExternal()) {
-				// TODO send through rest
-			} else {
-				// TODO send through rabbit
+			for (Region serviceRegion : rs.getLocations()) {
+				if (serviceRegion.getName().equals(m.getRegionID())) {
+					if (rs.isExternal()) {
+						log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to " + rs.getName()
+								+ " through REST");
+						// TODO send through rest
+					} else {
+						log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to " + rs.getName()
+								+ " through Rabbit");
+						// TODO send through rabbit
+					}
+					break;
+				}
 			}
 		}
 	}
 
 	/**
-	 * Method that consumes the route requests and redirects them to the correct service
+	 * Method that consumes the route requests and redirects them to the correct
+	 * service
+	 * 
 	 * @param r
 	 * @return
 	 */
 	private RouteResponse routeRequestConsumer(RouteRequest r) {
+		log.info("Received route request");
 		for (RoutingService rs : this.registeredRoutingServices) {
 			// TODO check if this is the service that the message should be sent to
 			if (rs.isExternal()) {
