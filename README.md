@@ -2,3 +2,5 @@
 [![codecov.io](https://codecov.io/github/symbiote-h2020/EnablerLogicGreenRouteController/branch/master/graph/badge.svg)](https://codecov.io/github/symbiote-h2020/EnablerLogicGreenRouteController)
 
 # Enabler Logic - Green Route Controller
+
+There are certain configurations that need to be set before starting this component. These configurations can be found in the bootstrap.properties file. They involve stating the regions to be considered and where can the files for those regions be found. Additionally, it is necessary to declare the routing services that are going to be used, stating, additionally, what regions they are interested in and if they are an internal or external service. 

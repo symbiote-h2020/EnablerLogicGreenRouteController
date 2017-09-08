@@ -110,7 +110,6 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 				;
 			}
 		}
-
 	}
 
 	/**
