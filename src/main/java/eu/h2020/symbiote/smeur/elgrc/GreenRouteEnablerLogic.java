@@ -10,12 +10,12 @@ import org.springframework.stereotype.Component;
 import eu.h2020.symbiote.enabler.messaging.model.EnablerLogicDataAppearedMessage;
 import eu.h2020.symbiote.enablerlogic.EnablerLogic;
 import eu.h2020.symbiote.enablerlogic.ProcessingLogic;
+import eu.h2020.symbiote.smeur.messages.PushInterpolatedStreetSegmentList;
 import eu.h2020.symbiote.smeur.messages.QueryInterpolatedStreetSegmentList;
 import eu.h2020.symbiote.smeur.messages.QueryInterpolatedStreetSegmentListResponse;
 import eu.h2020.symbiote.smeur.messages.RegisterRegion;
 import eu.h2020.symbiote.smeur.messages.RegisterRegionResponse;
 import eu.h2020.symbiote.smeur.StreetSegmentList;
-import eu.h2020.symbiote.smeur.elgrc.model.AirQualityUpdateMessage;
 import eu.h2020.symbiote.smeur.elgrc.model.RouteRequest;
 import eu.h2020.symbiote.smeur.elgrc.model.RouteResponse;
 import eu.h2020.symbiote.smeur.elgrc.routing.Region;
@@ -133,7 +133,7 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	private void registerConsumers() {
 		// Consume Air Quality Updates
 		log.info("Setting up Air Quality Updates Consumer");
-		enablerLogic.registerAsyncMessageFromEnablerLogicConsumer(AirQualityUpdateMessage.class,
+		enablerLogic.registerAsyncMessageFromEnablerLogicConsumer(PushInterpolatedStreetSegmentList.class,
 				(m) -> this.airQualityUpdatesConsumer(m));
 
 		// Consume route Requests
@@ -180,12 +180,12 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	 * 
 	 * @param m
 	 */
-	private void airQualityUpdatesConsumer(AirQualityUpdateMessage m) {
-		log.info("Received data from " + m.getRegionID());
+	private void airQualityUpdatesConsumer(PushInterpolatedStreetSegmentList m) {
+		log.info("Received data from " + m.regionID);
 		// Should be similar to requestAirQualityData
 		for (RoutingService rs : this.registeredRoutingServices) {
 			for (Region serviceRegion : rs.getLocations()) {
-				if (serviceRegion.getName().equals(m.getRegionID())) {
+				if (serviceRegion.getName().equals(m.regionID)) {
 					if (rs.isExternal()) {
 						log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to " + rs.getName()
 								+ " through REST");

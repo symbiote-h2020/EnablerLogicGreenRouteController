@@ -23,31 +23,56 @@ import eu.h2020.symbiote.smeur.StreetSegment;
 import eu.h2020.symbiote.smeur.elgrc.GreenRouteEnablerLogic;
 
 public class MapParser {
-	//TODO needs commenting and testing
 	private static final Logger log = LoggerFactory.getLogger(MapParser.class);
 
-	public static void parser(String fileName) {
+	/**
+	 * Method that parses osm file to classes to be used in Enabler
+	 * 
+	 * @param fileName
+	 *            Location of the file
+	 * @return hashmap of id : ways
+	 */
+	public static Map<String, StreetSegment> parser(String fileName) {
+		long startTime = System.currentTimeMillis();
 		log.info("Parsing Nodes of " + fileName);
 		Map<String, Node> nodeMap = parseNodes(fileName);
 		log.info("Parsing Ways of " + fileName);
 		Map<String, StreetSegment> wayMap = parseWays(fileName, nodeMap);
+		long duration = (System.currentTimeMillis() - startTime);
+		log.info("Parsing finished, it took " + duration + " milliseconds");
+		return wayMap;
 	}
 
+	/**
+	 * Method that loads file and parses nodes into a hashmap to be referred later
+	 * when parsing ways
+	 * 
+	 * @param fileName
+	 *            Location of the file
+	 * @return hashmap of id : node
+	 */
 	private static Map<String, Node> parseNodes(String fileName) {
 		Map<String, Node> nodeMap = new HashMap<String, Node>();
 		Node node = null;
 		boolean hasEverything = true;
+		
+		/*
+		 * This library parses XML files line by line, allowing not loading an entire (possibly huge) file into memory
+		 */
 		XMLInputFactory xmlInputFactory = XMLInputFactory.newInstance();
 		try {
 			XMLEventReader xmlEventReader = xmlInputFactory.createXMLEventReader(new FileInputStream(fileName));
 			while (xmlEventReader.hasNext()) {
 				XMLEvent xmlEvent = xmlEventReader.nextEvent();
+				
+				// Catch start of element
 				if (xmlEvent.isStartElement()) {
 					StartElement startElement = xmlEvent.asStartElement();
+					
+					// If it is a node element, catch its properties
 					if (startElement.getName().getLocalPart().equals("node")) {
 						node = new Node();
 
-						// Get the 'id' attribute from Employee element
 						Attribute idAttr = startElement.getAttributeByName(new QName("id"));
 						if (idAttr != null) {
 							node.id = idAttr.getValue();
@@ -70,6 +95,8 @@ public class MapParser {
 						}
 					}
 				}
+				
+				// If it is the end of an (node) element, save it
 				if (xmlEvent.isEndElement()) {
 					EndElement endElement = xmlEvent.asEndElement();
 					if (!endElement.getName().getLocalPart().equals("node")) {
@@ -95,13 +122,21 @@ public class MapParser {
 		StreetSegment way = null;
 		ArrayList<Location> locationAL = new ArrayList<Location>();
 		int nNodes = 0;
+		
+		/*
+		 * This library parses XML files line by line, allowing not loading an entire (possibly huge) file into memory
+		 */
 		XMLInputFactory xmlInputFactory = XMLInputFactory.newInstance();
 		try {
 			XMLEventReader xmlEventReader = xmlInputFactory.createXMLEventReader(new FileInputStream(fileName));
 			while (xmlEventReader.hasNext()) {
 				XMLEvent xmlEvent = xmlEventReader.nextEvent();
+				
+				// Catch start of element
 				if (xmlEvent.isStartElement()) {
 					StartElement startElement = xmlEvent.asStartElement();
+					
+					// If it is a way element, catch its properties
 					if (startElement.getName().getLocalPart().equals("way")) {
 						way = new StreetSegment();
 						Attribute idAttr = startElement.getAttributeByName(new QName("id"));
@@ -109,13 +144,17 @@ public class MapParser {
 							way.id = idAttr.getValue();
 						}
 					}
-					
+
+					// If propertie is a reference to a node, go fetch it to the hashmap
 					else if (way != null && startElement.getName().getLocalPart().equals("nd")) {
 						Attribute refAttr = startElement.getAttributeByName(new QName("ref"));
 						Node n = nodeMap.get(refAttr.getValue());
 						locationAL.add(new Location(n.lon, n.lat, 100, "", ""));
 						nNodes += 1;
-					} else if (way != null && startElement.getName().getLocalPart().equals("tag")) {
+					} 
+					
+					// If it is a tag, see if value if the name of the way, if it is, save it
+					else if (way != null && startElement.getName().getLocalPart().equals("tag")) {
 						Attribute keyAttr = startElement.getAttributeByName(new QName("k"));
 						if (keyAttr.getValue().equals("name")) {
 							Attribute idName = startElement.getAttributeByName(new QName("v"));
@@ -123,9 +162,10 @@ public class MapParser {
 								way.comment = idName.getValue();
 							}
 						}
-					} 
+					}
 				}
 
+				// If it is the end of the way element, save it 
 				if (xmlEvent.isEndElement()) {
 					EndElement endElement = xmlEvent.asEndElement();
 					if (!endElement.getName().getLocalPart().equals("way")) {
