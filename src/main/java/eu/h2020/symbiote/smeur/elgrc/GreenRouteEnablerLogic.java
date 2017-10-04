@@ -8,16 +8,18 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import eu.h2020.symbiote.enabler.messaging.model.EnablerLogicDataAppearedMessage;
+import eu.h2020.symbiote.enabler.messaging.model.ResourcesUpdated;
+import eu.h2020.symbiote.enabler.messaging.model.NotEnoughResourcesAvailable;
 import eu.h2020.symbiote.enablerlogic.EnablerLogic;
 import eu.h2020.symbiote.enablerlogic.ProcessingLogic;
+import eu.h2020.symbiote.smeur.messages.GrcRequest;
+import eu.h2020.symbiote.smeur.messages.GrcResponse;
 import eu.h2020.symbiote.smeur.messages.PushInterpolatedStreetSegmentList;
 import eu.h2020.symbiote.smeur.messages.QueryInterpolatedStreetSegmentList;
 import eu.h2020.symbiote.smeur.messages.QueryInterpolatedStreetSegmentListResponse;
 import eu.h2020.symbiote.smeur.messages.RegisterRegion;
 import eu.h2020.symbiote.smeur.messages.RegisterRegionResponse;
 import eu.h2020.symbiote.smeur.StreetSegmentList;
-import eu.h2020.symbiote.smeur.elgrc.model.RouteRequest;
-import eu.h2020.symbiote.smeur.elgrc.model.RouteResponse;
 import eu.h2020.symbiote.smeur.elgrc.routing.Region;
 import eu.h2020.symbiote.smeur.elgrc.routing.RoutingService;
 
@@ -58,6 +60,16 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	@Override
 	public void measurementReceived(EnablerLogicDataAppearedMessage dataAppeared) {
 		System.out.println("received new Observations:\n" + dataAppeared);
+	}
+	
+	@Override
+	public void resourcesUpdated(ResourcesUpdated ru) {
+		System.out.println("Resources Updated:\n" + ru);
+	}
+	
+	@Override
+	public void notEnoughResources(NotEnoughResourcesAvailable nera) {
+		System.out.println("Not Enough Resources Available:\n" + nera);
 	}
 
 	/**
@@ -137,7 +149,7 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 
 		// Consume route Requests
 		log.info("Setting up Route Request Consumer");
-		enablerLogic.registerSyncMessageFromEnablerLogicConsumer(RouteRequest.class,
+		enablerLogic.registerSyncMessageFromEnablerLogicConsumer(GrcRequest.class,
 				(m) -> this.routeRequestConsumer(m));
 	}
 
@@ -207,7 +219,7 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	 * @param r
 	 * @return
 	 */
-	private RouteResponse routeRequestConsumer(RouteRequest r) {
+	private GrcResponse routeRequestConsumer(GrcRequest r) {
 		log.info("Received route request");
 		for (RoutingService rs : this.registeredRoutingServices) {
 			// TODO check if this is the service that the message should be sent to
