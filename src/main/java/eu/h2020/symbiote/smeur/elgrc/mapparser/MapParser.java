@@ -1,4 +1,4 @@
-package mapparser;
+package eu.h2020.symbiote.smeur.elgrc.mapparser;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;

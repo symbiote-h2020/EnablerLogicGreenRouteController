@@ -121,7 +121,6 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	 */
 	private RegisterRegion buildRegistrationMessage(Region region) {
 		log.info("Loading Street Data Information");
-		// TODO get streetsegments from file in region.file
 		RegisterRegion registrationMessage = new RegisterRegion();
 		registrationMessage.regionID = region.getName();
 		return registrationMessage;
