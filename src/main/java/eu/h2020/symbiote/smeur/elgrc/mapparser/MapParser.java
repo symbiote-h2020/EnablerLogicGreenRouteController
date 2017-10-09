@@ -122,6 +122,7 @@ public class MapParser {
 		StreetSegment way = null;
 		ArrayList<Location> locationAL = new ArrayList<Location>();
 		int nNodes = 0;
+		int nWays = 0;
 		
 		/*
 		 * This library parses XML files line by line, allowing not loading an entire (possibly huge) file into memory
@@ -174,7 +175,12 @@ public class MapParser {
 					if (endElement.getName().getLocalPart().equals("way") && nNodes > 1) {
 						way.segmentData = locationAL.toArray(new Location[locationAL.size()]);
 						wayMap.put(way.id, way);
+						nWays += 1;
 					}
+					if (nWays % 500 == 0) {
+						log.info(""+nWays);
+					}
+					nNodes = 0;
 					way = null;
 				}
 			}
