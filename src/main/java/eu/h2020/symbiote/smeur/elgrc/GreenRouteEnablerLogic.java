@@ -79,8 +79,12 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	private void buildServicesStructures() {
 		String[] regionsArray = this.regions.split(";");
 		String[] regionsFiles = this.regionsFiles.split(";");
-		for (int i = 0; i < regionsArray.length; i++)
-			registeredRegions.add(new Region(regionsArray[i], regionsFiles[i]));
+		for (int i = 0; i < regionsArray.length; i++) {
+			Region r = new Region(regionsArray[i], regionsFiles[i]);
+			log.info("Going to parse file for " + regionsArray[i] + "region");
+			r.parseStreetSegments();
+			registeredRegions.add(r);
+		}
 
 		/*
 		 * This part could probably be made more efficient with the use of hashmaps, but
@@ -135,6 +139,7 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 		log.info("Loading Street Data Information");
 		RegisterRegion registrationMessage = new RegisterRegion();
 		registrationMessage.regionID = region.getName();
+		registrationMessage.streetSegments = region.getStreetSegmentList();
 		return registrationMessage;
 	}
 

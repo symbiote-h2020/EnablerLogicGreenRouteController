@@ -20,7 +20,7 @@ import org.slf4j.LoggerFactory;
 
 import eu.h2020.symbiote.cloud.model.data.observation.Location;
 import eu.h2020.symbiote.smeur.StreetSegment;
-import eu.h2020.symbiote.smeur.elgrc.GreenRouteEnablerLogic;
+import eu.h2020.symbiote.smeur.StreetSegmentList;
 
 public class MapParser {
 	private static final Logger log = LoggerFactory.getLogger(MapParser.class);
@@ -32,12 +32,12 @@ public class MapParser {
 	 *            Location of the file
 	 * @return hashmap of id : ways
 	 */
-	public static Map<String, StreetSegment> parser(String fileName) {
+	public static StreetSegmentList parser(String fileName) {
 		long startTime = System.currentTimeMillis();
 		log.info("Parsing Nodes of " + fileName);
 		Map<String, Node> nodeMap = parseNodes(fileName);
 		log.info("Parsing Ways of " + fileName);
-		Map<String, StreetSegment> wayMap = parseWays(fileName, nodeMap);
+		StreetSegmentList wayMap = parseWays(fileName, nodeMap);
 		long duration = (System.currentTimeMillis() - startTime);
 		log.info("Parsing finished, it took " + duration + " milliseconds");
 		return wayMap;
@@ -117,8 +117,8 @@ public class MapParser {
 		return nodeMap;
 	}
 
-	private static Map<String, StreetSegment> parseWays(String fileName, Map<String, Node> nodeMap) {
-		Map<String, StreetSegment> wayMap = new HashMap<String, StreetSegment>();
+	private static StreetSegmentList parseWays(String fileName, Map<String, Node> nodeMap) {
+		StreetSegmentList wayMap = new StreetSegmentList();
 		StreetSegment way = null;
 		ArrayList<Location> locationAL = new ArrayList<Location>();
 		int nNodes = 0;
