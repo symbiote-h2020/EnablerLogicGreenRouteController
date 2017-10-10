@@ -1,12 +1,15 @@
 package eu.h2020.symbiote.smeur.elgrc;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import eu.h2020.symbiote.cloud.model.data.observation.Property;
 import eu.h2020.symbiote.enabler.messaging.model.EnablerLogicDataAppearedMessage;
 import eu.h2020.symbiote.enabler.messaging.model.ResourcesUpdated;
 import eu.h2020.symbiote.enabler.messaging.model.NotEnoughResourcesAvailable;
@@ -140,6 +143,10 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 		RegisterRegion registrationMessage = new RegisterRegion();
 		registrationMessage.regionID = region.getName();
 		registrationMessage.streetSegments = region.getStreetSegmentList();
+		registrationMessage.yPushInterpolatedValues = true;
+		Set<Property> propSet = new HashSet<Property>();
+		propSet.add(new Property("dummyProp", "dummyProp"));
+		registrationMessage.properties = propSet;
 		return registrationMessage;
 	}
 

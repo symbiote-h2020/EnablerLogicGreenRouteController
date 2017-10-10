@@ -177,9 +177,19 @@ public class MapParser {
 						wayMap.put(way.id, way);
 						nWays += 1;
 					}
-					if (nWays % 500 == 0) {
-						log.info(""+nWays);
-					}
+					locationAL = new ArrayList<Location>();
+					/* if (nWays % 1000 == 0) {
+						Runtime runtime = Runtime.getRuntime();
+						long totalMemory = runtime.totalMemory();
+						long freeMemory = runtime.freeMemory();
+						long maxMemory = runtime.maxMemory();
+						log.info(" --- ");
+						log.info("Ways:         " + nWays);
+						log.info("Total Memory: " + totalMemory);
+						log.info("Free Memory:  " + freeMemory);
+						log.info("Max Memory:   " + maxMemory);
+						
+					}*/
 					nNodes = 0;
 					way = null;
 				}
