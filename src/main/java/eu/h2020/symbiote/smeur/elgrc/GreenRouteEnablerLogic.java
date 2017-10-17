@@ -39,6 +39,8 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	String regions;
 	@Value("${routing.regions.files}")
 	String regionsFiles;
+	@Value("${routing.regions.fileFormats}")
+	String regionsFileFormats;
 	@Value("${routing.services}")
 	String services;
 	@Value("${routing.services.preferences}")
@@ -82,8 +84,9 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	private void buildServicesStructures() {
 		String[] regionsArray = this.regions.split(";");
 		String[] regionsFiles = this.regionsFiles.split(";");
+		String[] regionsFileFormats = this.regionsFileFormats.split(";");
 		for (int i = 0; i < regionsArray.length; i++) {
-			Region r = new Region(regionsArray[i], regionsFiles[i]);
+			Region r = new Region(regionsArray[i], regionsFiles[i], regionsFileFormats[i]);
 			log.info("Going to parse file for " + regionsArray[i] + "region");
 			r.parseStreetSegments();
 			registeredRegions.add(r);
@@ -124,9 +127,14 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 
 			RegisterRegionResponse response = enablerLogic.sendSyncMessageToEnablerLogic("EnablerLogicInterpolator",
 					registrationMessage, RegisterRegionResponse.class);
-			if (response.status != RegisterRegionResponse.StatusCode.SUCCESS) {
-				// TODO check not success
-				;
+			log.info("Response from registering with Interpolator: " + response);
+			try {
+				if (response.status != RegisterRegionResponse.StatusCode.SUCCESS) {
+					// TODO check not success
+					;
+				}
+			} catch (NullPointerException npe) {
+				log.error("Response from Interpolator when GRC registers is null!");
 			}
 		}
 	}

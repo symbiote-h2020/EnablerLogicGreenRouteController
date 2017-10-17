@@ -15,6 +15,9 @@ import javax.xml.stream.events.EndElement;
 import javax.xml.stream.events.StartElement;
 import javax.xml.stream.events.XMLEvent;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.json.JSONTokener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,14 +35,31 @@ public class MapParser {
 	 *            Location of the file
 	 * @return hashmap of id : ways
 	 */
-	public static StreetSegmentList parser(String fileName) {
+	public static StreetSegmentList parser(String fileName, String fileFormat) {
 		long startTime = System.currentTimeMillis();
-		log.info("Parsing Nodes of " + fileName);
-		Map<String, Node> nodeMap = parseNodes(fileName);
-		log.info("Parsing Ways of " + fileName);
-		StreetSegmentList wayMap = parseWays(fileName, nodeMap);
+		StreetSegmentList wayMap = null;
+		
+		if (fileFormat.equals("osm")) {
+			log.info("Parsing Nodes of " + fileName);
+			Map<String, Node> nodeMap = parseNodesOsm(fileName);
+			log.info("Parsing Ways of " + fileName);
+			wayMap = parseWaysOsm(fileName, nodeMap);
+		}
+		
+		else if (fileFormat.equals("geojson")) {
+			log.info("Parsing Ways of " + fileName);
+			wayMap = parseWaysGeoJson(fileName); 
+		}
+		
+		else {
+			//TODO raise exception?
+			log.info("File format for " + fileName + " nor supported for parsing!");
+			return null;
+		}
+		
 		long duration = (System.currentTimeMillis() - startTime);
 		log.info("Parsing finished, it took " + duration + " milliseconds");
+		
 		return wayMap;
 	}
 
@@ -51,7 +71,7 @@ public class MapParser {
 	 *            Location of the file
 	 * @return hashmap of id : node
 	 */
-	private static Map<String, Node> parseNodes(String fileName) {
+	private static Map<String, Node> parseNodesOsm(String fileName) {
 		Map<String, Node> nodeMap = new HashMap<String, Node>();
 		Node node = null;
 		boolean hasEverything = true;
@@ -117,12 +137,11 @@ public class MapParser {
 		return nodeMap;
 	}
 
-	private static StreetSegmentList parseWays(String fileName, Map<String, Node> nodeMap) {
+	private static StreetSegmentList parseWaysOsm(String fileName, Map<String, Node> nodeMap) {
 		StreetSegmentList wayMap = new StreetSegmentList();
 		StreetSegment way = null;
 		ArrayList<Location> locationAL = new ArrayList<Location>();
 		int nNodes = 0;
-		int nWays = 0;
 		
 		/*
 		 * This library parses XML files line by line, allowing not loading an entire (possibly huge) file into memory
@@ -175,7 +194,6 @@ public class MapParser {
 					if (endElement.getName().getLocalPart().equals("way") && nNodes > 1) {
 						way.segmentData = locationAL.toArray(new Location[locationAL.size()]);
 						wayMap.put(way.id, way);
-						nWays += 1;
 					}
 					locationAL = new ArrayList<Location>();
 					/* if (nWays % 1000 == 0) {
@@ -188,7 +206,6 @@ public class MapParser {
 						log.info("Total Memory: " + totalMemory);
 						log.info("Free Memory:  " + freeMemory);
 						log.info("Max Memory:   " + maxMemory);
-						
 					}*/
 					nNodes = 0;
 					way = null;
@@ -202,5 +219,51 @@ public class MapParser {
 		}
 		return wayMap;
 	}
-
+	/**
+	 * Method that loads file and parses nodes into a hashmap to be referred later
+	 * when parsing ways
+	 * 
+	 * @param fileName
+	 * 			Location of the file
+	 * @return
+	 */
+	private static StreetSegmentList parseWaysGeoJson(String fileName) {
+		StreetSegmentList wayMap = new StreetSegmentList();
+		FileInputStream fis = null;
+		
+		try {
+			//Load file
+			fis = new FileInputStream(fileName);
+			JSONTokener tokener = new JSONTokener(fis);
+			JSONObject root = new JSONObject(tokener);
+			
+			//Loop through ways
+			JSONArray waysJson = root.getJSONArray("features");
+			for (int i = 0; i < waysJson.length(); i++) {
+				StreetSegment way = new StreetSegment();
+				ArrayList<Location> locationAL = new ArrayList<Location>();
+				
+				//Get way id
+				way.id = waysJson.getJSONObject(i).getJSONObject("properties").getString("id");
+				
+				//Loop through nodes in way and store them in list
+				JSONArray nodesJson = waysJson.getJSONObject(i).getJSONObject("geometry").getJSONArray("coordinates");
+				for (int j = 0; j < nodesJson.length(); j++) {
+					double lon = nodesJson.getJSONArray(j).getDouble(0);
+					double lat = nodesJson.getJSONArray(j).getDouble(1);
+					locationAL.add(new Location(lon, lat, 100, "", ""));
+				}
+				
+				//Save way
+				way.segmentData = locationAL.toArray(new Location[locationAL.size()]);
+				wayMap.put(way.id, way);
+			}
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+			return null;
+		}
+		
+		return wayMap;
+	}
+	
 }

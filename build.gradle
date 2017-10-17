@@ -58,7 +58,7 @@ configurations.all {
 }
 
 dependencies {
-    
+    compile group: 'org.json', name: 'json', version: '20170516'
     /* SymbIoTeLibraries manual:
         One can use the library from jitpack by default with the notation:
             compile('com.github.symbiote-h2020:SymbIoTeLibraries:develop-SNAPSHOT') {changing = true }

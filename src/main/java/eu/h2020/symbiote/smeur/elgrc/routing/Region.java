@@ -6,15 +6,17 @@ import eu.h2020.symbiote.smeur.elgrc.mapparser.MapParser;
 public class Region {
 	private String name;
 	private String file;
+	private String fileFormat;
 	private StreetSegmentList streetSegmentList;
 	
 	public Region() {
 		
 	}
 	
-	public Region(String name, String file) {
+	public Region(String name, String file, String fileFormat) {
 		this.setName(name);
 		this.setFile(file);
+		this.setFileFormat(fileFormat);
 	}
 
 	public String getName() {
@@ -45,6 +47,15 @@ public class Region {
 	 * Method to parse this regions file 
 	 */
 	public void parseStreetSegments() {
-		this.streetSegmentList = MapParser.parser(this.file);
+		this.streetSegmentList = MapParser.parser(this.file, this.fileFormat);
 	}
+
+	public String getFileFormat() {
+		return fileFormat;
+	}
+
+	public void setFileFormat(String fileFormat) {
+		this.fileFormat = fileFormat;
+	}
+
 }
