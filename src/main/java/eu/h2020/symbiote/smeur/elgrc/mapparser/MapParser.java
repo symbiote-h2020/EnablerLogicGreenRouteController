@@ -21,7 +21,7 @@ import org.json.JSONTokener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import eu.h2020.symbiote.cloud.model.data.observation.Location;
+import eu.h2020.symbiote.model.cim.WGS84Location;
 import eu.h2020.symbiote.smeur.StreetSegment;
 import eu.h2020.symbiote.smeur.StreetSegmentList;
 
@@ -140,7 +140,7 @@ public class MapParser {
 	private static StreetSegmentList parseWaysOsm(String fileName, Map<String, Node> nodeMap) {
 		StreetSegmentList wayMap = new StreetSegmentList();
 		StreetSegment way = null;
-		ArrayList<Location> locationAL = new ArrayList<Location>();
+		ArrayList<WGS84Location> locationAL = new ArrayList<WGS84Location>();
 		int nNodes = 0;
 		
 		/*
@@ -169,7 +169,7 @@ public class MapParser {
 					else if (way != null && startElement.getName().getLocalPart().equals("nd")) {
 						Attribute refAttr = startElement.getAttributeByName(new QName("ref"));
 						Node n = nodeMap.get(refAttr.getValue());
-						locationAL.add(new Location(n.lon, n.lat, 100, "", ""));
+						locationAL.add(new WGS84Location(n.lon, n.lat, 100, "", new ArrayList<String>()));
 						nNodes += 1;
 					} 
 					
@@ -192,10 +192,10 @@ public class MapParser {
 						continue;
 					}
 					if (endElement.getName().getLocalPart().equals("way") && nNodes > 1) {
-						way.segmentData = locationAL.toArray(new Location[locationAL.size()]);
+						way.segmentData = locationAL.toArray(new WGS84Location[locationAL.size()]);
 						wayMap.put(way.id, way);
 					}
-					locationAL = new ArrayList<Location>();
+					locationAL = new ArrayList<WGS84Location>();
 					/* if (nWays % 1000 == 0) {
 						Runtime runtime = Runtime.getRuntime();
 						long totalMemory = runtime.totalMemory();
@@ -241,7 +241,7 @@ public class MapParser {
 			JSONArray waysJson = root.getJSONArray("features");
 			for (int i = 0; i < waysJson.length(); i++) {
 				StreetSegment way = new StreetSegment();
-				ArrayList<Location> locationAL = new ArrayList<Location>();
+				ArrayList<WGS84Location> locationAL = new ArrayList<WGS84Location>();
 				
 				//Get way id
 				way.id = waysJson.getJSONObject(i).getJSONObject("properties").getString("id");
@@ -251,11 +251,11 @@ public class MapParser {
 				for (int j = 0; j < nodesJson.length(); j++) {
 					double lon = nodesJson.getJSONArray(j).getDouble(0);
 					double lat = nodesJson.getJSONArray(j).getDouble(1);
-					locationAL.add(new Location(lon, lat, 100, "", ""));
+					locationAL.add(new WGS84Location(lon, lat, 100, "", new ArrayList<String>()));
 				}
 				
 				//Save way
-				way.segmentData = locationAL.toArray(new Location[locationAL.size()]);
+				way.segmentData = locationAL.toArray(new WGS84Location[locationAL.size()]);
 				wayMap.put(way.id, way);
 			}
 		} catch (FileNotFoundException e) {

@@ -9,12 +9,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import eu.h2020.symbiote.cloud.model.data.observation.Property;
 import eu.h2020.symbiote.enabler.messaging.model.EnablerLogicDataAppearedMessage;
 import eu.h2020.symbiote.enabler.messaging.model.ResourcesUpdated;
 import eu.h2020.symbiote.enabler.messaging.model.NotEnoughResourcesAvailable;
 import eu.h2020.symbiote.enablerlogic.EnablerLogic;
 import eu.h2020.symbiote.enablerlogic.ProcessingLogic;
+import eu.h2020.symbiote.model.cim.Property;
 import eu.h2020.symbiote.smeur.messages.GrcRequest;
 import eu.h2020.symbiote.smeur.messages.GrcResponse;
 import eu.h2020.symbiote.smeur.messages.PushInterpolatedStreetSegmentList;
@@ -153,7 +153,8 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 		registrationMessage.streetSegments = region.getStreetSegmentList();
 		registrationMessage.yPushInterpolatedValues = true;
 		Set<Property> propSet = new HashSet<Property>();
-		propSet.add(new Property("dummyProp", "dummyProp"));
+		new Property("dummyProp", new ArrayList<String>());
+		propSet.add(new Property("dummyProp", new ArrayList<String>()));
 		registrationMessage.properties = propSet;
 		return registrationMessage;
 	}
