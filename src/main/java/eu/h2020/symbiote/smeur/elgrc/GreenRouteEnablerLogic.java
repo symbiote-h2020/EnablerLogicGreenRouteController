@@ -22,6 +22,7 @@ import eu.h2020.symbiote.smeur.messages.QueryInterpolatedStreetSegmentList;
 import eu.h2020.symbiote.smeur.messages.QueryInterpolatedStreetSegmentListResponse;
 import eu.h2020.symbiote.smeur.messages.RegisterRegion;
 import eu.h2020.symbiote.smeur.messages.RegisterRegionResponse;
+import eu.h2020.symbiote.smeur.messages.Waypoint;
 import eu.h2020.symbiote.smeur.StreetSegmentList;
 import eu.h2020.symbiote.smeur.elgrc.routing.Region;
 import eu.h2020.symbiote.smeur.elgrc.routing.RoutingService;
@@ -153,8 +154,8 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 		registrationMessage.streetSegments = region.getStreetSegmentList();
 		registrationMessage.yPushInterpolatedValues = true;
 		Set<Property> propSet = new HashSet<Property>();
-		new Property("dummyProp", new ArrayList<String>());
-		propSet.add(new Property("dummyProp", new ArrayList<String>()));
+		new Property("temperature", new ArrayList<String>());
+		propSet.add(new Property("temperature", new ArrayList<String>()));
 		registrationMessage.properties = propSet;
 		return registrationMessage;
 	}
@@ -186,23 +187,28 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 					"EnablerLogicInterpolator", interpolatedRequest, QueryInterpolatedStreetSegmentListResponse.class);
 
 			log.info("Received data from " + region.getName());
-			StreetSegmentList streetSegments = response.theList;
-
-			for (RoutingService rs : this.registeredRoutingServices) {
-				for (Region serviceRegion : rs.getLocations()) {
-					if (serviceRegion.getName().equals(region.getName())) {
-						if (rs.isExternal()) {
-							log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to "
-									+ rs.getName() + " through REST");
-							// TODO send street segments and qir quality to service (REST)
-						} else {
-							log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to "
-									+ rs.getName() + " through Rabbit");
-							// TODO send street segments and qir quality to PP (Rabbit)
+			try {
+				StreetSegmentList streetSegments = response.theList;
+	
+				for (RoutingService rs : this.registeredRoutingServices) {
+					for (Region serviceRegion : rs.getLocations()) {
+						if (serviceRegion.getName().equals(region.getName())) {
+							if (rs.isExternal()) {
+								log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to "
+										+ rs.getName() + " through REST");
+								// TODO send street segments and qir quality to service (REST)
+							} else {
+								log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to "
+										+ rs.getName() + " through Rabbit");
+								// TODO send street segments and qir quality to PP (Rabbit)
+							}
+							break;
 						}
-						break;
 					}
 				}
+			} catch (NullPointerException e) {
+				//TODO should this expection catcher be kept?
+				log.error("Got no data from Interpolator!");
 			}
 		}
 	}
@@ -250,7 +256,12 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 				// TODO send through rabbit
 			}
 		}
-		return null;
+		GrcResponse dummyResponse = new GrcResponse();
+		dummyResponse.setAirQualityRating(1.0);
+		dummyResponse.setDistance(1.0);
+		dummyResponse.setTravelTime(1.0);
+		dummyResponse.setRoute(new ArrayList<Waypoint>());
+		return dummyResponse;
 	}
 
 }
