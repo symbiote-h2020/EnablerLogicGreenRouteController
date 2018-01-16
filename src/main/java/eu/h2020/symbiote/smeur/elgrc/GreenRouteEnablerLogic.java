@@ -2,19 +2,38 @@ package eu.h2020.symbiote.smeur.elgrc;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.databind.SerializationFeature;
+
+import at.ac.ait.ariadne.routeformat.ModeOfTransport;
+import at.ac.ait.ariadne.routeformat.RequestModeOfTransport;
+import at.ac.ait.ariadne.routeformat.RouteSegment;
+import at.ac.ait.ariadne.routeformat.RoutingResponse;
+import at.ac.ait.ariadne.routeformat.RoutingRequest;
+import at.ac.ait.ariadne.routeformat.Constants.GeneralizedModeOfTransportType;
+import at.ac.ait.ariadne.routeformat.geojson.GeoJSONCoordinate;
+import at.ac.ait.ariadne.routeformat.location.Location;
 import eu.h2020.symbiote.enabler.messaging.model.EnablerLogicDataAppearedMessage;
 import eu.h2020.symbiote.enabler.messaging.model.ResourcesUpdated;
 import eu.h2020.symbiote.enabler.messaging.model.NotEnoughResourcesAvailable;
 import eu.h2020.symbiote.enablerlogic.EnablerLogic;
 import eu.h2020.symbiote.enablerlogic.ProcessingLogic;
 import eu.h2020.symbiote.model.cim.Property;
+import eu.h2020.symbiote.model.cim.WGS84Location;
 import eu.h2020.symbiote.smeur.messages.GrcRequest;
 import eu.h2020.symbiote.smeur.messages.GrcResponse;
 import eu.h2020.symbiote.smeur.messages.PushInterpolatedStreetSegmentList;
@@ -251,7 +270,65 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 		for (RoutingService rs : this.registeredRoutingServices) {
 			// TODO check if this is the service that the message should be sent to
 			if (rs.isExternal()) {
-				// TODO send through rest
+				// https://github.com/dts-ait/ariadne-json-route-format/blob/master/src/main/java/at/ac/ait/ariadne/routeformat/RoutingRequest.java
+				log.info("Building POST request");
+				RoutingRequest rr = new RoutingRequest();
+
+				// Define locations
+				GeoJSONCoordinate gjcFrom = GeoJSONCoordinate.create(
+						((WGS84Location)r.getFrom()).getLongitude(), 
+						((WGS84Location)r.getFrom()).getLatitude(), 
+						((WGS84Location)r.getFrom()).getAltitude());
+				GeoJSONCoordinate gjcTo = GeoJSONCoordinate.create(
+						((WGS84Location)r.getTo()).getLongitude(), 
+						((WGS84Location)r.getTo()).getLatitude(), 
+						((WGS84Location)r.getTo()).getAltitude());
+				Location<?> locFrom = Location.createMinimal(gjcFrom);
+				Location<?> locTo = Location.createMinimal(gjcTo);
+				
+				// Define mode of transportation, 
+				ModeOfTransport mot = ModeOfTransport.createMinimal(GeneralizedModeOfTransportType.FOOT);
+				RequestModeOfTransport<?> rmot = RequestModeOfTransport.createMinimal(mot);
+				ArrayList<RequestModeOfTransport<?>> rmotList = new ArrayList<RequestModeOfTransport<?>>();
+				rmotList.add(rmot);
+				
+				// Put everything into model
+				rr.setFrom(locFrom);
+				rr.setTo(locTo);
+				rr.setOptimizedFor("TRAVELTIME");
+				rr.setModesOfTransport(rmotList);
+				
+				// Send Post request with parameters
+				RestTemplate template = new RestTemplate();
+				HttpEntity<RoutingRequest> request = new HttpEntity<>(rr);
+				// TODO put url in config files
+				HttpEntity<String> response = template.exchange("http://62.218.164.227:8080/symbiote/rest/routes", HttpMethod.POST, request, String.class);
+	
+				// Obtain url to obtain route
+				HttpHeaders headers = response.getHeaders();
+				String getUrl = headers.getLocation().toString();
+				
+				// Get request to obtain route
+				RoutingResponse routeResponse = template.getForObject(getUrl, RoutingResponse.class);
+				
+				// Start extracting data from the response into our own model
+				RouteSegment route = routeResponse.getRoutes().get(0).getSegments().get(0);
+				
+				List<GeoJSONCoordinate> coorList = route.getGeometryGeoJson().get().getGeometry().getCoordinates();
+				List<Waypoint> wayList = new ArrayList<Waypoint>();
+				for (GeoJSONCoordinate coor : coorList) {
+					Waypoint w = new Waypoint();
+					w.setLocation(new WGS84Location(coor.getX().doubleValue(), coor.getY().doubleValue(), 100, "", new ArrayList<String>()));
+					wayList.add(w);
+				}
+				
+				GrcResponse resp = new GrcResponse();
+				resp.setDistance(route.getDistanceMeters());
+				resp.setTravelTime(route.getDurationSeconds());
+				resp.setAirQualityRating(0);
+				resp.setRoute(wayList);
+				
+				return resp;
 			} else {
 				// TODO send through rabbit
 			}

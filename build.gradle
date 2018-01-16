@@ -73,6 +73,8 @@ dependencies {
     compile('com.github.symbiote-h2020:SymbIoTeLibraries:develop-SNAPSHOT') { changing = true }
     // compile('com.github.symbiote-h2020:SymbIoTeLibraries:0.2.0')
 
+	//openUwedat libs
+	compile('com.github.dts-ait:ariadne-json-route-format:master-SNAPSHOT')
 
 
     // Spring
