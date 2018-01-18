@@ -67,6 +67,8 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	String servicesPreferences;
 	@Value("${routing.services.isexternal}")
 	String servicesIsExternal;
+	@Value("${routing.services.api.routerequest}")
+	String servicesRouteAPIs;
 
 	@Override
 	public void initialization(EnablerLogic enablerLogic) {
@@ -86,12 +88,12 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	public void measurementReceived(EnablerLogicDataAppearedMessage dataAppeared) {
 		System.out.println("received new Observations:\n" + dataAppeared);
 	}
-	
+
 	@Override
 	public void resourcesUpdated(ResourcesUpdated ru) {
 		System.out.println("Resources Updated:\n" + ru);
 	}
-	
+
 	@Override
 	public void notEnoughResources(NotEnoughResourcesAvailable nera) {
 		System.out.println("Not Enough Resources Available:\n" + nera);
@@ -119,10 +121,13 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 		String[] servicesArray = this.services.split(";");
 		String[] servicesPreferences = this.servicesPreferences.split(";");
 		String[] servicesIsExternal = this.servicesIsExternal.split(";");
+		String[] servicesRouteAPIs = this.servicesRouteAPIs.split(";");
+
 		for (int i = 0; i < servicesArray.length; i++) {
 			RoutingService newService = new RoutingService();
 			newService.setName(servicesArray[i]);
 			newService.setExternal(Boolean.parseBoolean(servicesIsExternal[i]));
+			newService.setRouteAPI(servicesRouteAPIs[i]);
 
 			String[] servicePreferences = servicesPreferences[i].split(",");
 			for (int j = 0; j < servicePreferences.length; j++) {
@@ -190,8 +195,7 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 
 		// Consume route Requests
 		log.info("Setting up Route Request Consumer");
-		enablerLogic.registerSyncMessageFromEnablerLogicConsumer(GrcRequest.class,
-				(m) -> this.routeRequestConsumer(m));
+		enablerLogic.registerSyncMessageFromEnablerLogicConsumer(GrcRequest.class, (m) -> this.routeRequestConsumer(m));
 	}
 
 	/**
@@ -208,7 +212,7 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 			log.info("Received data from " + region.getName());
 			try {
 				StreetSegmentList streetSegments = response.theList;
-	
+
 				for (RoutingService rs : this.registeredRoutingServices) {
 					for (Region serviceRegion : rs.getLocations()) {
 						if (serviceRegion.getName().equals(region.getName())) {
@@ -226,7 +230,7 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 					}
 				}
 			} catch (NullPointerException e) {
-				//TODO should this expection catcher be kept?
+				// TODO should this expection catcher be kept?
 				log.error("Got no data from Interpolator!");
 			}
 		}
@@ -275,59 +279,57 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 				RoutingRequest rr = new RoutingRequest();
 
 				// Define locations
-				GeoJSONCoordinate gjcFrom = GeoJSONCoordinate.create(
-						((WGS84Location)r.getFrom()).getLongitude(), 
-						((WGS84Location)r.getFrom()).getLatitude(), 
-						((WGS84Location)r.getFrom()).getAltitude());
-				GeoJSONCoordinate gjcTo = GeoJSONCoordinate.create(
-						((WGS84Location)r.getTo()).getLongitude(), 
-						((WGS84Location)r.getTo()).getLatitude(), 
-						((WGS84Location)r.getTo()).getAltitude());
+				GeoJSONCoordinate gjcFrom = GeoJSONCoordinate.create(((WGS84Location) r.getFrom()).getLongitude(),
+						((WGS84Location) r.getFrom()).getLatitude(), ((WGS84Location) r.getFrom()).getAltitude());
+				GeoJSONCoordinate gjcTo = GeoJSONCoordinate.create(((WGS84Location) r.getTo()).getLongitude(),
+						((WGS84Location) r.getTo()).getLatitude(), ((WGS84Location) r.getTo()).getAltitude());
 				Location<?> locFrom = Location.createMinimal(gjcFrom);
 				Location<?> locTo = Location.createMinimal(gjcTo);
-				
-				// Define mode of transportation, 
+
+				// Define mode of transportation,
 				ModeOfTransport mot = ModeOfTransport.createMinimal(GeneralizedModeOfTransportType.FOOT);
 				RequestModeOfTransport<?> rmot = RequestModeOfTransport.createMinimal(mot);
 				ArrayList<RequestModeOfTransport<?>> rmotList = new ArrayList<RequestModeOfTransport<?>>();
 				rmotList.add(rmot);
-				
+
 				// Put everything into model
 				rr.setFrom(locFrom);
 				rr.setTo(locTo);
 				rr.setOptimizedFor("TRAVELTIME");
 				rr.setModesOfTransport(rmotList);
-				
+
 				// Send Post request with parameters
 				RestTemplate template = new RestTemplate();
 				HttpEntity<RoutingRequest> request = new HttpEntity<>(rr);
-				// TODO put url in config files
-				HttpEntity<String> response = template.exchange("http://62.218.164.227:8080/symbiote/rest/routes", HttpMethod.POST, request, String.class);
-	
+
+				HttpEntity<String> response = template.exchange(rs.getRouteAPI(), HttpMethod.POST, request,
+						String.class);
+
 				// Obtain url to obtain route
 				HttpHeaders headers = response.getHeaders();
 				String getUrl = headers.getLocation().toString();
-				
+
 				// Get request to obtain route
 				RoutingResponse routeResponse = template.getForObject(getUrl, RoutingResponse.class);
-				
+
 				// Start extracting data from the response into our own model
 				RouteSegment route = routeResponse.getRoutes().get(0).getSegments().get(0);
-				
+
 				List<GeoJSONCoordinate> coorList = route.getGeometryGeoJson().get().getGeometry().getCoordinates();
 				List<Waypoint> wayList = new ArrayList<Waypoint>();
 				for (GeoJSONCoordinate coor : coorList) {
 					Waypoint w = new Waypoint();
-					w.setLocation(new WGS84Location(coor.getX().doubleValue(), coor.getY().doubleValue(), 100, "", new ArrayList<String>()));
+					w.setLocation(new WGS84Location(coor.getX().doubleValue(), coor.getY().doubleValue(), 100, "",
+							new ArrayList<String>()));
 					wayList.add(w);
 				}
-				
+
 				GrcResponse resp = new GrcResponse();
 				resp.setDistance(route.getDistanceMeters());
 				resp.setTravelTime(route.getDurationSeconds());
 				resp.setAirQualityRating(0);
 				resp.setRoute(wayList);
-				
+
 				return resp;
 			} else {
 				// TODO send through rabbit
