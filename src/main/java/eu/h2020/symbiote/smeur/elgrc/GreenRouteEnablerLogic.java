@@ -14,11 +14,6 @@ import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectWriter;
-import com.fasterxml.jackson.databind.SerializationFeature;
-
 import at.ac.ait.ariadne.routeformat.ModeOfTransport;
 import at.ac.ait.ariadne.routeformat.RequestModeOfTransport;
 import at.ac.ait.ariadne.routeformat.RouteSegment;
@@ -250,6 +245,8 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 					if (rs.isExternal()) {
 						log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to " + rs.getName()
 								+ " through REST");
+						//log.info(m.theList.toString());
+						log.info("The size of the received data is" + m.theList.size());
 						// TODO send through rest
 					} else {
 						log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to " + rs.getName()
