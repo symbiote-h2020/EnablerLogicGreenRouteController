@@ -73,10 +73,10 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 
 		// do stuff
 		buildServicesStructures();
+		registerConsumers();
 		registerWithInterpolator();
 		// the previous step might take a while?
 		requestAirQualityData();
-		registerConsumers();
 	}
 
 	@Override
@@ -146,7 +146,7 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 			RegisterRegion registrationMessage = buildRegistrationMessage(region);
 
 			RegisterRegionResponse response = enablerLogic.sendSyncMessageToEnablerLogic("EnablerLogicInterpolator",
-					registrationMessage, RegisterRegionResponse.class);
+					registrationMessage, RegisterRegionResponse.class, 120_000);
 			log.info("Response from registering with Interpolator: " + response);
 			try {
 				if (response.status != RegisterRegionResponse.StatusCode.SUCCESS) {
@@ -245,8 +245,13 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 					if (rs.isExternal()) {
 						log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to " + rs.getName()
 								+ " through REST");
-						//log.info(m.theList.toString());
-						log.info("The size of the received data is" + m.theList.size());
+						// log.info(m.theList.toString());
+						try {
+							log.info("The size of the received data is " + m.theList.size());
+						} catch (NullPointerException e) {
+							log.error("Received a null update!");
+						}
+						
 						// TODO send through rest
 					} else {
 						log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to " + rs.getName()
