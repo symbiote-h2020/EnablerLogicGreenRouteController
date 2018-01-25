@@ -56,6 +56,8 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	String regionsFiles;
 	@Value("${routing.regions.fileFormats}")
 	String regionsFileFormats;
+	@Value("${routing.regions.properties}")
+	String regionsProperties;
 	@Value("${routing.services}")
 	String services;
 	@Value("${routing.services.preferences}")
@@ -102,8 +104,16 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 		String[] regionsArray = this.regions.split(";");
 		String[] regionsFiles = this.regionsFiles.split(";");
 		String[] regionsFileFormats = this.regionsFileFormats.split(";");
+		String[] regionsProperties = this.regionsProperties.split(";");
+		
 		for (int i = 0; i < regionsArray.length; i++) {
-			Region r = new Region(regionsArray[i], regionsFiles[i], regionsFileFormats[i]);
+			Set<Property> propSet = new HashSet<Property>();
+			
+			String[] regionProperties = regionsProperties[i].split(",");
+			for (String regionProperty : regionProperties) 
+				propSet.add(new Property(regionProperty, new ArrayList<String>()));
+			
+			Region r = new Region(regionsArray[i], regionsFiles[i], regionsFileFormats[i], propSet);
 			log.info("Going to parse file for " + regionsArray[i] + "region");
 			r.parseStreetSegments();
 			registeredRegions.add(r);
@@ -172,10 +182,10 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 		registrationMessage.regionID = region.getName();
 		registrationMessage.streetSegments = region.getStreetSegmentList();
 		registrationMessage.yPushInterpolatedValues = true;
-		Set<Property> propSet = new HashSet<Property>();
+		/* Set<Property> propSet = new HashSet<Property>();
 		new Property("temperature", new ArrayList<String>());
-		propSet.add(new Property("temperature", new ArrayList<String>()));
-		registrationMessage.properties = propSet;
+		propSet.add(new Property("temperature", new ArrayList<String>())); */
+		registrationMessage.properties = region.getProperties();
 		return registrationMessage;
 	}
 
@@ -301,6 +311,7 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 				rr.setModesOfTransport(rmotList);
 
 				// Send Post request with parameters
+				log.info("Sendind POST request to AIT!");
 				RestTemplate template = new RestTemplate();
 				HttpEntity<RoutingRequest> request = new HttpEntity<>(rr);
 
@@ -312,6 +323,7 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 				String getUrl = headers.getLocation().toString();
 
 				// Get request to obtain route
+				log.info("Sendind GET request to AIT!");
 				RoutingResponse routeResponse = template.getForObject(getUrl, RoutingResponse.class);
 
 				// Start extracting data from the response into our own model
@@ -331,6 +343,9 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 				resp.setTravelTime(route.getDurationSeconds());
 				resp.setAirQualityRating(0);
 				resp.setRoute(wayList);
+				
+				String logGrcMessage = "GRC message: \nDistance: " + resp.getDistance() + "\nTravelTime: " + resp.getTravelTime() + "\nRouteSize: " + resp.getRoute().size();
+				log.info(logGrcMessage);
 
 				return resp;
 			} else {
