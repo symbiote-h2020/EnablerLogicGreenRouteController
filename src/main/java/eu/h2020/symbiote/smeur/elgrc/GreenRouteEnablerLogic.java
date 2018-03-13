@@ -242,7 +242,6 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 					}
 				}
 			} catch (NullPointerException e) {
-				// TODO should this expection catcher be kept?
 				log.error("Got no data from Interpolator!");
 			}
 		}
