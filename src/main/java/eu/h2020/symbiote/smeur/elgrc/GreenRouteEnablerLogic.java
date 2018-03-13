@@ -58,6 +58,8 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	String regionsFileFormats;
 	@Value("${routing.regions.properties}")
 	String regionsProperties;
+	@Value("${routing.regions.properties.iri}")
+	String regionsPropertiesIRI;
 	@Value("${routing.services}")
 	String services;
 	@Value("${routing.services.preferences}")
@@ -105,13 +107,18 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 		String[] regionsFiles = this.regionsFiles.split(";");
 		String[] regionsFileFormats = this.regionsFileFormats.split(";");
 		String[] regionsProperties = this.regionsProperties.split(";");
+		String[] regionsPropertiesIRI = this.regionsPropertiesIRI.split(";");
 		
 		for (int i = 0; i < regionsArray.length; i++) {
 			Set<Property> propSet = new HashSet<Property>();
 			
 			String[] regionProperties = regionsProperties[i].split(",");
-			for (String regionProperty : regionProperties) 
-				propSet.add(new Property(regionProperty, new ArrayList<String>()));
+			String[] regionPropertiesIRI = regionsPropertiesIRI[i].split(",");
+			
+			for (int j = 0; j < regionProperties.length; j++) 
+				propSet.add(new Property(
+						regionProperties[j], regionPropertiesIRI[j], new ArrayList<String>()));
+			
 			
 			Region r = new Region(regionsArray[i], regionsFiles[i], regionsFileFormats[i], propSet);
 			log.info("Going to parse file for " + regionsArray[i] + "region");
