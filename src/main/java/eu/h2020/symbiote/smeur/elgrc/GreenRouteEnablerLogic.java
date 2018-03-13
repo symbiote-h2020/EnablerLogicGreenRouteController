@@ -12,6 +12,8 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import at.ac.ait.ariadne.routeformat.ModeOfTransport;
@@ -68,6 +70,8 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	String servicesIsExternal;
 	@Value("${routing.services.api.routerequest}")
 	String servicesRouteAPIs;
+	@Value("${routing.services.api.aqupdates}")
+	String servicesAQUpdates;
 
 	@Override
 	public void initialization(EnablerLogic enablerLogic) {
@@ -134,12 +138,14 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 		String[] servicesPreferences = this.servicesPreferences.split(";");
 		String[] servicesIsExternal = this.servicesIsExternal.split(";");
 		String[] servicesRouteAPIs = this.servicesRouteAPIs.split(";");
+		String[] servicesAQUpdates = this.servicesAQUpdates.split(";");
 
 		for (int i = 0; i < servicesArray.length; i++) {
 			RoutingService newService = new RoutingService();
 			newService.setName(servicesArray[i]);
 			newService.setExternal(Boolean.parseBoolean(servicesIsExternal[i]));
 			newService.setRouteAPI(servicesRouteAPIs[i]);
+			newService.setAQUpdateAPI(servicesAQUpdates[i]);
 
 			String[] servicePreferences = servicesPreferences[i].split(",");
 			for (int j = 0; j < servicePreferences.length; j++) {
@@ -231,7 +237,22 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 							if (rs.isExternal()) {
 								log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to "
 										+ rs.getName() + " through REST");
-								// TODO send street segments and qir quality to service (REST)
+								
+								PushInterpolatedStreetSegmentList toSend = new PushInterpolatedStreetSegmentList();
+								toSend.theList = streetSegments;
+								toSend.regionID = region.getName();
+								
+								RestTemplate template = new RestTemplate();
+								HttpEntity<PushInterpolatedStreetSegmentList> request = new HttpEntity<>(toSend);
+
+								try {
+									HttpEntity<String> postResponse = template.exchange(rs.getAQUpdateAPI(), HttpMethod.POST, request,
+										String.class);
+									//Will we expect something here?
+								} catch (HttpClientErrorException | HttpServerErrorException httpClientOrServerExc) {
+									httpClientOrServerExc.printStackTrace();
+								}
+								
 							} else {
 								log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to "
 										+ rs.getName() + " through Rabbit");
@@ -261,14 +282,24 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 					if (rs.isExternal()) {
 						log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to " + rs.getName()
 								+ " through REST");
-						// log.info(m.theList.toString());
+
 						try {
 							log.info("The size of the received data is " + m.theList.size());
 						} catch (NullPointerException e) {
 							log.error("Received a null update!");
 						}
 						
-						// TODO send through rest
+						RestTemplate template = new RestTemplate();
+						HttpEntity<PushInterpolatedStreetSegmentList> request = new HttpEntity<>(m);
+
+						try {
+							HttpEntity<String> postResponse = template.exchange(rs.getAQUpdateAPI(), HttpMethod.POST, request,
+								String.class);
+							// Will we expect something here?
+						} catch (HttpClientErrorException | HttpServerErrorException httpClientOrServerExc) {
+							httpClientOrServerExc.printStackTrace();
+						}
+						
 					} else {
 						log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to " + rs.getName()
 								+ " through Rabbit");

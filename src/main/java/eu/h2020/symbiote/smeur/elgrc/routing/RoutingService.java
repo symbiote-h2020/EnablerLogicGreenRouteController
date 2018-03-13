@@ -8,16 +8,18 @@ public class RoutingService {
 	private String name;
 	private ArrayList<Region> locations;
 	private String routeAPI;
+	private String aQUpdateAPI;
 	
 	public RoutingService() {
 		this.setLocations(new ArrayList<Region>());
 	}
 	
-	public RoutingService(boolean isExternal, String name, ArrayList<Region> locations, String routeAPI) {
+	public RoutingService(boolean isExternal, String name, ArrayList<Region> locations, String routeAPI, String aQUpdateAPI) {
 		this.setExternal(isExternal);
 		this.setName(name);
 		this.setLocations(locations);
 		this.setRouteAPI(routeAPI);
+		this.setAQUpdateAPI(aQUpdateAPI);
 	}
 
 	public boolean isExternal() {
@@ -54,6 +56,14 @@ public class RoutingService {
 
 	public void setRouteAPI(String routeAPI) {
 		this.routeAPI = routeAPI;
+	}
+
+	public String getAQUpdateAPI() {
+		return aQUpdateAPI;
+	}
+
+	public void setAQUpdateAPI(String aQUpdateAPI) {
+		this.aQUpdateAPI = aQUpdateAPI;
 	}
 	
 }
