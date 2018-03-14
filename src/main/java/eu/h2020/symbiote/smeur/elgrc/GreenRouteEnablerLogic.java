@@ -11,6 +11,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -321,8 +323,12 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 				RestTemplate template = new RestTemplate();
 				HttpEntity<RoutingRequest> request = new HttpEntity<>(rr);
 
-				HttpEntity<String> response = template.exchange(rs.getRouteAPI(), HttpMethod.POST, request,
+				ResponseEntity<String> response = template.exchange(rs.getRouteAPI(), HttpMethod.POST, request,
 						String.class);
+				if (response.getStatusCode() != HttpStatus.CREATED) {
+					log.error("Could not correctly communicate with Routing Service!");
+					return new GrcResponse(); //Eventually change to something different
+				}
 
 				// Obtain url to obtain route
 				HttpHeaders headers = response.getHeaders();
