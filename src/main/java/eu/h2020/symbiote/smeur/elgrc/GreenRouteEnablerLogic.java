@@ -1,5 +1,7 @@
 package eu.h2020.symbiote.smeur.elgrc;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -11,10 +13,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+
+import com.fasterxml.jackson.core.JsonGenerationException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import at.ac.ait.ariadne.routeformat.ModeOfTransport;
 import at.ac.ait.ariadne.routeformat.RequestModeOfTransport;
@@ -82,7 +88,7 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 		registerConsumers();
 		registerWithInterpolator();
 		// the previous step might take a while?
-		requestAirQualityData();
+		//TODO keep this comented? requestAirQualityData();
 	}
 
 	@Override
@@ -161,7 +167,9 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	 * Method that sends the streetsegments to the interpolator
 	 */
 	private void registerWithInterpolator() {
+		log.info("Registering regions with the Interpolator...");
 		for (Region region : this.registeredRegions) {
+			log.info("Registering " + region.getName() + " region...");
 			RegisterRegion registrationMessage = buildRegistrationMessage(region);
 
 			RegisterRegionResponse response = enablerLogic.sendSyncMessageToEnablerLogic("EnablerLogicInterpolator",
@@ -186,14 +194,11 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	 * @return the message to be sent
 	 */
 	private RegisterRegion buildRegistrationMessage(Region region) {
-		log.info("Loading Street Data Information");
+		log.info("Loading Street Data Information for " + region.getName());
 		RegisterRegion registrationMessage = new RegisterRegion();
 		registrationMessage.regionID = region.getName();
 		registrationMessage.streetSegments = region.getStreetSegmentList();
 		registrationMessage.yPushInterpolatedValues = true;
-		/* Set<Property> propSet = new HashSet<Property>();
-		new Property("temperature", new ArrayList<String>());
-		propSet.add(new Property("temperature", new ArrayList<String>())); */
 		registrationMessage.properties = region.getProperties();
 		return registrationMessage;
 	}
@@ -225,8 +230,6 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 
 			log.info("Received data from " + region.getName());
 			try {
-				StreetSegmentList streetSegments = response.theList;
-
 				for (RoutingService rs : this.registeredRoutingServices) {
 					for (Region serviceRegion : rs.getLocations()) {
 						if (serviceRegion.getName().equals(region.getName())) {
@@ -234,6 +237,8 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 								log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to "
 										+ rs.getName() + " through REST");
 								// TODO send street segments and qir quality to service (REST)
+								
+								
 							} else {
 								log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to "
 										+ rs.getName() + " through Rabbit");
@@ -256,6 +261,24 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	 */
 	private void airQualityUpdatesConsumer(PushInterpolatedStreetSegmentList m) {
 		log.info("Received data from " + m.regionID);
+		
+		log.info("Storing to file data from " + m.regionID);
+		StreetSegmentList streetSegments = m.theList;
+		ObjectMapper mapper = new ObjectMapper();
+		try {
+			mapper.writeValue(new File("streetSegments" + m.regionID + ".json"), streetSegments);
+		} catch (JsonGenerationException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (JsonMappingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		log.info("DONE!");
+		
 		// Should be similar to requestAirQualityData
 		for (RoutingService rs : this.registeredRoutingServices) {
 			for (Region serviceRegion : rs.getLocations()) {
@@ -322,12 +345,15 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 				log.info("Sendind POST request to AIT!");
 				RestTemplate template = new RestTemplate();
 				HttpEntity<RoutingRequest> request = new HttpEntity<>(rr);
-
-				ResponseEntity<String> response = template.exchange(rs.getRouteAPI(), HttpMethod.POST, request,
-						String.class);
-				if (response.getStatusCode() != HttpStatus.CREATED) {
-					log.error("Could not correctly communicate with Routing Service!");
-					return new GrcResponse(); //Eventually change to something different
+				ResponseEntity<String> response = null;
+				
+				try {
+					response = template.exchange(rs.getRouteAPI(), HttpMethod.POST, request,
+							String.class);
+				} catch (HttpClientErrorException e) {
+					log.error("Problem communicating with AIT Routing Engine!");
+					e.printStackTrace();
+					return new GrcResponse();
 				}
 
 				// Obtain url to obtain route
