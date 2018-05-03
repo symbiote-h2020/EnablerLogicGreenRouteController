@@ -44,6 +44,7 @@ import eu.h2020.symbiote.smeur.messages.QueryInterpolatedStreetSegmentList;
 import eu.h2020.symbiote.smeur.messages.QueryInterpolatedStreetSegmentListResponse;
 import eu.h2020.symbiote.smeur.messages.RegisterRegion;
 import eu.h2020.symbiote.smeur.messages.RegisterRegionResponse;
+import eu.h2020.symbiote.smeur.messages.RouteCommunication;
 import eu.h2020.symbiote.smeur.messages.Waypoint;
 import eu.h2020.symbiote.smeur.StreetSegmentList;
 import eu.h2020.symbiote.smeur.elgrc.routing.Region;
@@ -215,8 +216,22 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 		// Consume route Requests
 		log.info("Setting up Route Request Consumer");
 		enablerLogic.registerSyncMessageFromEnablerLogicConsumer(GrcRequest.class, (m) -> this.routeRequestConsumer(m));
+		
+		// Consume route Requests
+		log.info("Setting up Route Communication Consumer");
+		enablerLogic.registerAsyncMessageFromEnablerLogicConsumer(RouteCommunication.class,
+				(m) -> this.routeCommunicationUpdatesConsumer(m));
+	}
+	
+	/**
+	 * Method to store route communications 
+	 */
+	private void routeCommunicationUpdatesConsumer(RouteCommunication rc) {
+		//TODO actually do something
+		log.info("Received point:\nId: " + rc.getRouteId() + "\nLocation: " + rc.getLocation() + "\nTimestamp: " + rc.getTimestamp());
 	}
 
+	
 	/**
 	 * Method to obtain air quality data from interpolator
 	 */
