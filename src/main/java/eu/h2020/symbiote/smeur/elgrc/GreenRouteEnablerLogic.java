@@ -212,23 +212,24 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 		log.info("Setting up Air Quality Updates Consumer");
 		enablerLogic.registerAsyncMessageFromEnablerLogicConsumer(PushInterpolatedStreetSegmentList.class,
 				(m) -> this.airQualityUpdatesConsumer(m));
+		
+		// Consume route communication Requests
+		log.info("Setting up Route Communication Consumer");
+		enablerLogic.registerSyncMessageFromEnablerLogicConsumer(RouteCommunication.class,
+				(m) -> this.routeCommunicationUpdatesConsumer(m));
 
 		// Consume route Requests
 		log.info("Setting up Route Request Consumer");
 		enablerLogic.registerSyncMessageFromEnablerLogicConsumer(GrcRequest.class, (m) -> this.routeRequestConsumer(m));
-		
-		// Consume route Requests
-		log.info("Setting up Route Communication Consumer");
-		enablerLogic.registerAsyncMessageFromEnablerLogicConsumer(RouteCommunication.class,
-				(m) -> this.routeCommunicationUpdatesConsumer(m));
 	}
 	
 	/**
 	 * Method to store route communications 
 	 */
-	private void routeCommunicationUpdatesConsumer(RouteCommunication rc) {
+	private GrcResponse routeCommunicationUpdatesConsumer(RouteCommunication rc) {
 		//TODO actually do something
-		log.info("Received point:\nId: " + rc.getRouteId() + "\nLocation: " + rc.getLocation() + "\nTimestamp: " + rc.getTimestamp());
+		log.info("Received point:\nId: " + rc.getRouteId() + "\n" + rc.getLocation() + "\nTimestamp: " + rc.getTimestamp());
+		return null;
 	}
 
 	
