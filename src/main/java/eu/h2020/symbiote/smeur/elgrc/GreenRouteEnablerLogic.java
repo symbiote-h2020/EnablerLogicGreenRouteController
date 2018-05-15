@@ -344,12 +344,20 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 						((WGS84Location) r.getTo()).getLatitude(), ((WGS84Location) r.getTo()).getAltitude());
 				Location<?> locFrom = Location.createMinimal(gjcFrom);
 				Location<?> locTo = Location.createMinimal(gjcTo);
-
+				
+				ArrayList<RequestModeOfTransport<?>> rmotList = null;
 				// Define mode of transportation,
-				ModeOfTransport mot = ModeOfTransport.createMinimal(GeneralizedModeOfTransportType.FOOT);
-				RequestModeOfTransport<?> rmot = RequestModeOfTransport.createMinimal(mot);
-				ArrayList<RequestModeOfTransport<?>> rmotList = new ArrayList<RequestModeOfTransport<?>>();
-				rmotList.add(rmot);
+				if (r.getTransportationMode().equalsIgnoreCase("foot")) {
+					ModeOfTransport mot = ModeOfTransport.createMinimal(GeneralizedModeOfTransportType.FOOT);
+					RequestModeOfTransport<?> rmot = RequestModeOfTransport.createMinimal(mot);
+					rmotList = new ArrayList<RequestModeOfTransport<?>>();
+					rmotList.add(rmot);
+				} else if (r.getTransportationMode().equalsIgnoreCase("bike") || r.getTransportationMode().equalsIgnoreCase("bicycle")) {
+					ModeOfTransport mot = ModeOfTransport.createMinimal(GeneralizedModeOfTransportType.BICYCLE);
+					RequestModeOfTransport<?> rmot = RequestModeOfTransport.createMinimal(mot);
+					rmotList = new ArrayList<RequestModeOfTransport<?>>();
+					rmotList.add(rmot);
+				}
 
 				// Put everything into model
 				rr.setFrom(locFrom);
