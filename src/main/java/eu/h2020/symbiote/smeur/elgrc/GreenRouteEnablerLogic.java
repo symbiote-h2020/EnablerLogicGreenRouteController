@@ -7,8 +7,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import eu.h2020.symbiote.smeur.elgrc.repositories.RouteRepository;
+import eu.h2020.symbiote.smeur.elgrc.repositories.entities.RoutePoint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -58,6 +61,9 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 
 	private ArrayList<Region> registeredRegions;
 	private ArrayList<RoutingService> registeredRoutingServices;
+
+	@Autowired
+	private RouteRepository routeRepo;
 
 	@Value("${routing.regions}")
 	String regions;
@@ -227,8 +233,10 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	 * Method to store route communications 
 	 */
 	private GrcResponse routeCommunicationUpdatesConsumer(RouteCommunication rc) {
-		//TODO actually do something
 		log.info("Received point:\nId: " + rc.getRouteId() + "\n" + rc.getLocation() + "\nTimestamp: " + rc.getTimestamp());
+
+		routeRepo.save(new RoutePoint(rc));
+
 		return null;
 	}
 
