@@ -3,6 +3,7 @@ package eu.h2020.symbiote.smeur.elgrc;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -22,6 +23,7 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import com.fasterxml.jackson.core.JsonGenerationException;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -33,11 +35,20 @@ import at.ac.ait.ariadne.routeformat.RoutingRequest;
 import at.ac.ait.ariadne.routeformat.Constants.GeneralizedModeOfTransportType;
 import at.ac.ait.ariadne.routeformat.geojson.GeoJSONCoordinate;
 import at.ac.ait.ariadne.routeformat.location.Location;
+import eu.h2020.symbiote.core.internal.CoreQueryRequest;
 import eu.h2020.symbiote.enabler.messaging.model.EnablerLogicDataAppearedMessage;
 import eu.h2020.symbiote.enabler.messaging.model.ResourcesUpdated;
+import eu.h2020.symbiote.enabler.messaging.model.ServiceExecutionTaskInfo;
+import eu.h2020.symbiote.enabler.messaging.model.ServiceExecutionTaskResponse;
+import eu.h2020.symbiote.enabler.messaging.model.ServiceParameter;
 import eu.h2020.symbiote.enabler.messaging.model.NotEnoughResourcesAvailable;
+import eu.h2020.symbiote.enabler.messaging.model.PlatformProxyResourceInfo;
+import eu.h2020.symbiote.enabler.messaging.model.ResourceManagerAcquisitionStartResponse;
+import eu.h2020.symbiote.enabler.messaging.model.ResourceManagerTaskInfoRequest;
+import eu.h2020.symbiote.enabler.messaging.model.ResourceManagerTaskInfoResponse;
 import eu.h2020.symbiote.enablerlogic.EnablerLogic;
 import eu.h2020.symbiote.enablerlogic.ProcessingLogic;
+import eu.h2020.symbiote.enablerlogic.messaging.properties.EnablerLogicProperties;
 import eu.h2020.symbiote.model.cim.Property;
 import eu.h2020.symbiote.model.cim.WGS84Location;
 import eu.h2020.symbiote.smeur.messages.GrcRequest;
@@ -58,12 +69,17 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	private static final Logger log = LoggerFactory.getLogger(GreenRouteEnablerLogic.class);
 
 	private EnablerLogic enablerLogic;
+	
+	@Autowired
+    private EnablerLogicProperties props;
 
 	private ArrayList<Region> registeredRegions;
 	private ArrayList<RoutingService> registeredRoutingServices;
 
 	@Autowired
 	private RouteRepository routeRepo;
+	
+	private PlatformProxyResourceInfo routingServiceInfo;
 
 	@Value("${routing.regions}")
 	String regions;
@@ -83,14 +99,19 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	String servicesIsExternal;
 	@Value("${routing.services.api.routerequest}")
 	String servicesRouteAPIs;
+	@Value("${routing.service.id}")
+	String routingServiceId;
+	
 
 	@Override
 	public void initialization(EnablerLogic enablerLogic) {
 		this.enablerLogic = enablerLogic;
 		this.registeredRegions = new ArrayList<Region>();
 		this.registeredRoutingServices = new ArrayList<RoutingService>();
+		this.routingServiceInfo = new PlatformProxyResourceInfo();
 
 		// do stuff
+		searchAndStoreRoutingService();
 		buildServicesStructures();
 		registerConsumers();
 		registerWithInterpolator();
@@ -111,6 +132,45 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	@Override
 	public void notEnoughResources(NotEnoughResourcesAvailable nera) {
 		System.out.println("Not Enough Resources Available:\n" + nera);
+	}
+	
+	/**
+	 * Method to serach and store the metainformation of the routing service 
+	 * from MoBaaS
+	 */
+	private void searchAndStoreRoutingService() {
+		log.info("Searching for routing service...");
+		CoreQueryRequest coreQueryRequest = new CoreQueryRequest();
+		coreQueryRequest.setId(routingServiceId);
+		
+		ResourceManagerTaskInfoRequest request = new ResourceManagerTaskInfoRequest(
+	    		"routing service search", //task id
+	    		1, 
+	    		1, 
+	    		coreQueryRequest, 
+	    		null, //"P0000-00-00T00:01:00",
+	    		false, 
+	    		null, 
+	    		false,
+	    		props.getEnablerName(), 
+	    		null
+	    	);
+
+	    ResourceManagerAcquisitionStartResponse response = enablerLogic.queryResourceManager(request);
+
+	    try {
+	        log.info("Response JSON: {}", new ObjectMapper().writeValueAsString(response));
+	    } catch (JsonProcessingException e) {
+	        log.info("Response: {}", response);
+	    }
+	    
+	    ResourceManagerTaskInfoResponse resourceManagerTaskInfoResponse = response.getTasks().get(0);
+		String resourceId = resourceManagerTaskInfoResponse.getResourceDescriptions().get(0).getId();
+		String accessURL = resourceManagerTaskInfoResponse.getResourceUrls().get(resourceId);
+		
+		routingServiceInfo.setAccessURL(accessURL);
+		routingServiceInfo.setResourceId(resourceId);
+		log.info("MoBaaS Routing Service obtained!");
 	}
 
 	/**
@@ -292,13 +352,10 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 		try {
 			mapper.writeValue(new File("streetSegments" + m.regionID + ".json"), streetSegments);
 		} catch (JsonGenerationException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (JsonMappingException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		log.info("DONE!");
@@ -339,8 +396,8 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	private GrcResponse routeRequestConsumer(GrcRequest r) {
 		log.info("Received route request");
 		for (RoutingService rs : this.registeredRoutingServices) {
-			// TODO check if this is the service that the message should be sent to
-			if (rs.isExternal()) {
+			if (isInVienna(r.getFrom())) {
+				log.info("The route is for Vienna ---> Send it to AIT!");
 				// https://github.com/dts-ait/ariadne-json-route-format/blob/master/src/main/java/at/ac/ait/ariadne/routeformat/RoutingRequest.java
 				log.info("Building POST request");
 				RoutingRequest rr = new RoutingRequest();
@@ -370,7 +427,7 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 				// Put everything into model
 				rr.setFrom(locFrom);
 				rr.setTo(locTo);
-				rr.setOptimizedFor("TRAVELTIME");
+				rr.setOptimizedFor("TRAVELTIME");  // TODO check if better option
 				rr.setModesOfTransport(rmotList);
 
 				// Send Post request with parameters
@@ -414,12 +471,38 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 				resp.setAirQualityRating(0);
 				resp.setRoute(wayList);
 				
-				String logGrcMessage = "GRC message: \nDistance: " + resp.getDistance() + "\nTravelTime: " + resp.getTravelTime() + "\nRouteSize: " + resp.getRoute().size();
+				String logGrcMessage = "GRC message: \nDistance: " + resp.getDistance() + "\nTravelTime: " + 
+						resp.getTravelTime() + "\nRouteSize: " + resp.getRoute().size();
+				
 				log.info(logGrcMessage);
 
 				return resp;
 			} else {
+				log.info("The route is not for Vienna ---> Send it to MoBaaS!");
 				// TODO send through rabbit
+				
+				String fromRequest = "" + r.getFrom().getLatitude() + "," + r.getFrom().getLongitude();
+				String toRequest = "" + r.getTo().getLatitude() + "," + r.getTo().getLongitude();
+				String modeRequest = "";
+				
+				if (r.getTransportationMode().equalsIgnoreCase("foot"))
+					modeRequest = "WALK";
+				else if (r.getTransportationMode().equalsIgnoreCase("bike") || r.getTransportationMode().equalsIgnoreCase("bicycle"))
+					modeRequest = "BICYCLE";
+				
+				
+				ServiceExecutionTaskResponse response = enablerLogic.invokeService(
+					new ServiceExecutionTaskInfo(
+						"routingServiceTask", routingServiceInfo, props.getEnablerName(), 
+						Arrays.asList(
+							new ServiceParameter("from", fromRequest),
+							new ServiceParameter("to", toRequest), 
+							new ServiceParameter("mode", modeRequest)
+						)
+					)
+				);
+				
+				log.info(response.toString());
 			}
 		}
 		GrcResponse dummyResponse = new GrcResponse();
@@ -428,6 +511,16 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 		dummyResponse.setTravelTime(1.0);
 		dummyResponse.setRoute(new ArrayList<Waypoint>());
 		return dummyResponse;
+	}
+	
+	
+	private boolean isInVienna(WGS84Location loc) {
+		double lat = loc.getLatitude();
+		double lon = loc.getLongitude();
+		if(lat >= 48.082850 && lat <= 48.330444 && lon >= 16.238929 && lon <= 16.560841) 
+			return true;
+		else 
+			return false;
 	}
 
 }
