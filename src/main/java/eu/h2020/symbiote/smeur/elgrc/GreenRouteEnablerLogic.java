@@ -503,8 +503,10 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 				);
 				
 				log.info(response.toString());
+				// TODO transform response to grcResponse
 			}
 		}
+		
 		GrcResponse dummyResponse = new GrcResponse();
 		dummyResponse.setAirQualityRating(1.0);
 		dummyResponse.setDistance(1.0);
