@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import eu.h2020.symbiote.smeur.elgrc.repositories.RouteRepository;
 import eu.h2020.symbiote.smeur.elgrc.repositories.entities.RoutePoint;
 import org.slf4j.Logger;
@@ -502,8 +503,17 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 					)
 				);
 				
-				log.info(response.toString());
-				// TODO transform response to grcResponse
+//				log.info(response.toString());
+
+				try {
+					ObjectMapper om = new ObjectMapper();
+					GrcResponse resp = om.readValue(response.getOutput(), new TypeReference<GrcResponse>(){});
+					return resp;
+
+				} catch (IOException e) {
+					log.error("Problem communicating with MoBaaS Routing Service!");
+					return new GrcResponse();
+				}
 			}
 		}
 		
