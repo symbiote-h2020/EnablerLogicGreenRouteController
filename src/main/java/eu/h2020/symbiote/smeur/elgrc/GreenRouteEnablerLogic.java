@@ -13,6 +13,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.gson.Gson;
+import eu.h2020.symbiote.smeur.elgrc.commons.Utils;
 import eu.h2020.symbiote.smeur.elgrc.repositories.RouteRepository;
 import eu.h2020.symbiote.smeur.elgrc.repositories.entities.RoutePoint;
 import org.slf4j.Logger;
@@ -354,8 +355,11 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 		log.info("Storing to file data from " + m.regionID);
 		StreetSegmentList streetSegments = m.theList;
 		ObjectMapper mapper = new ObjectMapper();
+
+		File newFile = new File("streetSegments" + m.regionID + ".json");
+
 		try {
-			mapper.writeValue(new File("streetSegments" + m.regionID + ".json"), streetSegments);
+			mapper.writeValue(newFile, streetSegments);
 		} catch (JsonGenerationException e) {
 			e.printStackTrace();
 		} catch (JsonMappingException e) {
@@ -381,9 +385,24 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 						
 						// TODO send through rest
 					} else {
+						File zipFile = null;
 						log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to " + rs.getName()
 								+ " through Rabbit");
 						// TODO send through rabbit
+
+						try {
+							// TODO ~ not tested yet
+							zipFile = Utils.zipCompress(newFile);
+
+							// TODO ~ send file
+
+						} catch (IOException e) {
+							log.error("[ERROR] compressing file > " + e.getMessage());«
+						} finally {
+							newFile.delete();
+							zipFile.delete();
+						}
+
 					}
 					break;
 				}
