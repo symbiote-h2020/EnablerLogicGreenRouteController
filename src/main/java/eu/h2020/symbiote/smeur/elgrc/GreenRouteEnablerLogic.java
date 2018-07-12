@@ -7,12 +7,9 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.google.gson.Gson;
 import eu.h2020.symbiote.smeur.elgrc.commons.Utils;
 import eu.h2020.symbiote.smeur.elgrc.repositories.RouteRepository;
 import eu.h2020.symbiote.smeur.elgrc.repositories.entities.RoutePoint;
@@ -20,19 +17,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.http.*;
 import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
-
 import com.fasterxml.jackson.core.JsonGenerationException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import at.ac.ait.ariadne.routeformat.ModeOfTransport;
 import at.ac.ait.ariadne.routeformat.RequestModeOfTransport;
 import at.ac.ait.ariadne.routeformat.RouteSegment;
@@ -107,7 +102,8 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	String servicesRouteAPIs;
 	@Value("${routing.service.id}")
 	String routingServiceId;
-	
+	@Value("${httpEndpoint.data.embers.city}")
+	String dataEmbersCityEndpoint;
 
 	@Override
 	public void initialization(EnablerLogic enablerLogic) {
@@ -385,22 +381,38 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 						
 						// TODO send through rest
 					} else {
-						File zipFile = null;
+						File targzFile = null;
 						log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to " + rs.getName()
 								+ " through Rabbit");
-						// TODO send through rabbit
-
 						try {
-							// TODO ~ not tested yet
-							zipFile = Utils.zipCompress(newFile);
+							log.info("\n#########################################\njson file > "
+									+ newFile.getAbsolutePath()
+									+"\n#########################################\n");
 
-							// TODO ~ send file
+							targzFile = Utils.targzCompress(newFile);
+
+							log.info("\n#########################################\ntar gz file > "
+									+ targzFile.getAbsolutePath()
+									+"\n#########################################\n");
+
+							// send file
+							MultiValueMap<String, Object> bodyMap = new LinkedMultiValueMap<>();
+							bodyMap.add("file",  new FileSystemResource(targzFile));
+							HttpHeaders headers = new HttpHeaders();
+							headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+							HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(bodyMap, headers);
+
+							RestTemplate restTemplate = new RestTemplate();
+							ResponseEntity<String> response = restTemplate.exchange(dataEmbersCityEndpoint,
+									HttpMethod.POST, requestEntity, String.class);
+
+							log.info("\nstatus code > " + response.getStatusCode());
 
 						} catch (IOException e) {
-							log.error("[ERROR] compressing file > " + e.getMessage());«
+							log.error("[ERROR] compressing file > " + e.getMessage());
 						} finally {
 							newFile.delete();
-							zipFile.delete();
+							targzFile.delete();
 						}
 
 					}
