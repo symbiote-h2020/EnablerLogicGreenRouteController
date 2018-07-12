@@ -96,6 +96,11 @@ dependencies {
     testCompile('org.springframework.boot:spring-boot-starter-test')
     testCompile('com.github.tomakehurst:wiremock')
     testCompile('org.springframework:spring-core')
+
+    compile 'org.apache.commons:commons-compress:1.17'
+
+
+
 }
 
 // code quality below
