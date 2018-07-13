@@ -2,14 +2,12 @@ package eu.h2020.symbiote.smeur.elgrc;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import eu.h2020.symbiote.smeur.elgrc.commons.Constants;
 import eu.h2020.symbiote.smeur.elgrc.commons.Utils;
 import eu.h2020.symbiote.smeur.elgrc.repositories.RouteRepository;
 import eu.h2020.symbiote.smeur.elgrc.repositories.entities.RoutePoint;
@@ -104,6 +102,9 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	String routingServiceId;
 	@Value("${httpEndpoint.data.embers.city}")
 	String dataEmbersCityEndpoint;
+
+	long lastRun=0 ;
+
 
 	@Override
 	public void initialization(EnablerLogic enablerLogic) {
@@ -381,38 +382,48 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 						
 						// TODO send through rest
 					} else {
+
 						File targzFile = null;
 						log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to " + rs.getName()
 								+ " through Rabbit");
 						try {
-							log.info("\n#########################################\njson file > "
-									+ newFile.getAbsolutePath()
-									+"\n#########################################\n");
+							long tenMinAgo = System.currentTimeMillis() - Constants.TEN_MINUTES;
+							if (lastRun == 0 || lastRun <= tenMinAgo) {
+								lastRun = System.currentTimeMillis();
+								log.info("\n#########################################\njson file > "
+										+ newFile.getAbsolutePath()
+										+ "\n#########################################\n");
 
-							targzFile = Utils.targzCompress(newFile);
+								targzFile = Utils.targzCompress(newFile);
 
-							log.info("\n#########################################\ntar gz file > "
-									+ targzFile.getAbsolutePath()
-									+"\n#########################################\n");
+								log.info("\n#########################################\ntar gz file > "
+										+ targzFile.getAbsolutePath()
+										+ "\n#########################################\n");
 
-							// send file
-							MultiValueMap<String, Object> bodyMap = new LinkedMultiValueMap<>();
-							bodyMap.add("file",  new FileSystemResource(targzFile));
-							HttpHeaders headers = new HttpHeaders();
-							headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-							HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(bodyMap, headers);
+								// send file
+								MultiValueMap<String, Object> bodyMap = new LinkedMultiValueMap<>();
+								bodyMap.add("file", new FileSystemResource(targzFile));
+								HttpHeaders headers = new HttpHeaders();
+								headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+								HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(bodyMap, headers);
 
-							RestTemplate restTemplate = new RestTemplate();
-							ResponseEntity<String> response = restTemplate.exchange(dataEmbersCityEndpoint,
-									HttpMethod.POST, requestEntity, String.class);
+								RestTemplate restTemplate = new RestTemplate();
+								ResponseEntity<String> response = restTemplate.exchange(dataEmbersCityEndpoint,
+										HttpMethod.POST, requestEntity, String.class);
 
-							log.info("\nstatus code > " + response.getStatusCode());
-
+								log.info("\nstatus code > " + response.getStatusCode());
+							}
 						} catch (IOException e) {
 							log.error("[ERROR] compressing file > " + e.getMessage());
 						} finally {
-							newFile.delete();
-							targzFile.delete();
+							try {
+								newFile.delete();
+								targzFile.delete();
+							}catch (NullPointerException e){
+								log.error("[ERROR] deleting file > " + e.getMessage());
+							}
+							newFile = null;
+							targzFile = null;
 						}
 
 					}
