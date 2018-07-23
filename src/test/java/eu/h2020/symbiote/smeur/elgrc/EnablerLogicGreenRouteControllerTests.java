@@ -21,7 +21,7 @@ import java.io.File;
 @SpringBootTest
 public class EnablerLogicGreenRouteControllerTests {
 
-    @Value("${httpEndpoint.data.embers.city}")
+    @Value("${httpEndpoint.mobaas}")
     String dataEmbersCityEndpoint;
 
 

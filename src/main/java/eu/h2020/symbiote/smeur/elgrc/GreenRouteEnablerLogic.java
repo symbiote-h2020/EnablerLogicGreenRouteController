@@ -21,6 +21,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestTemplate;
 import com.fasterxml.jackson.core.JsonGenerationException;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -100,8 +101,8 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	String servicesRouteAPIs;
 	@Value("${routing.service.id}")
 	String routingServiceId;
-	@Value("${httpEndpoint.data.embers.city}")
-	String dataEmbersCityEndpoint;
+	@Value("${httpEndpoint.mobaas}")
+	String mobaasEndPoint;
 
 	long lastRun=0 ;
 
@@ -159,21 +160,34 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	    		null
 	    	);
 
-	    ResourceManagerAcquisitionStartResponse response = enablerLogic.queryResourceManager(request);
-
-	    try {
-	        log.info("Response JSON: {}", new ObjectMapper().writeValueAsString(response));
-	    } catch (JsonProcessingException e) {
-	        log.info("Response: {}", response);
-	    }
+		boolean still_trying = true; //Can't run the service without finding the routing service
+	    while(still_trying) {
+	    		still_trying = false;
+		    ResourceManagerAcquisitionStartResponse response = enablerLogic.queryResourceManager(request);
+	
+		    try {
+		        log.info("Response JSON: {}", new ObjectMapper().writeValueAsString(response));
+		    } catch (JsonProcessingException e) {
+		        log.info("Response: {}", response);
+		    }
 	    
-	    ResourceManagerTaskInfoResponse resourceManagerTaskInfoResponse = response.getTasks().get(0);
-		String resourceId = resourceManagerTaskInfoResponse.getResourceDescriptions().get(0).getId();
-		String accessURL = resourceManagerTaskInfoResponse.getResourceUrls().get(resourceId);
-		
-		routingServiceInfo.setAccessURL(accessURL);
-		routingServiceInfo.setResourceId(resourceId);
-		log.info("MoBaaS Routing Service obtained!");
+		    ResourceManagerTaskInfoResponse resourceManagerTaskInfoResponse = response.getTasks().get(0);
+		    
+		    if ((resourceManagerTaskInfoResponse.getResourceDescriptions().size())==0) {
+		    		log.error("Got no response from Core about Routing Service, got to keep trying..");
+		    		still_trying=true;
+		    		try {
+						Thread.sleep(10000);
+				} catch (InterruptedException e) {
+						e.printStackTrace();
+				}
+		    } else {
+				String resourceId = resourceManagerTaskInfoResponse.getResourceDescriptions().get(0).getId();
+				String accessURL = resourceManagerTaskInfoResponse.getResourceUrls().get(resourceId);routingServiceInfo.setAccessURL(accessURL);
+				routingServiceInfo.setResourceId(resourceId);
+				log.info("MoBaaS Routing Service obtained!");
+		    }
+	    }
 	}
 
 	/**
@@ -347,16 +361,20 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	 * @param m
 	 */
 	private void airQualityUpdatesConsumer(PushInterpolatedStreetSegmentList m) {
+		if (m.theList == null) {
+			log.error("Received null update for " + m.regionID + "from the Interpolator");
+			return;
+		}
+		
 		log.info("Received data from " + m.regionID);
 		
 		log.info("Storing to file data from " + m.regionID);
-		StreetSegmentList streetSegments = m.theList;
 		ObjectMapper mapper = new ObjectMapper();
 
 		File newFile = new File("streetSegments" + m.regionID + ".json");
 
 		try {
-			mapper.writeValue(newFile, streetSegments);
+			mapper.writeValue(newFile, m.theList);
 		} catch (JsonGenerationException e) {
 			e.printStackTrace();
 		} catch (JsonMappingException e) {
@@ -383,12 +401,11 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 						// TODO send through rest
 					} else {
 
+						long tenMinAgo = System.currentTimeMillis() - Constants.TEN_MINUTES;
+						if (lastRun == 0 || lastRun <= tenMinAgo) {
 						File targzFile = null;
-						log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to " + rs.getName()
-								+ " through Rabbit");
+						log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to " + rs.getName());
 						try {
-							long tenMinAgo = System.currentTimeMillis() - Constants.TEN_MINUTES;
-							if (lastRun == 0 || lastRun <= tenMinAgo) {
 								lastRun = System.currentTimeMillis();
 								log.info("\n#########################################\njson file > "
 										+ newFile.getAbsolutePath()
@@ -408,22 +425,24 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 								HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(bodyMap, headers);
 
 								RestTemplate restTemplate = new RestTemplate();
-								ResponseEntity<String> response = restTemplate.exchange(dataEmbersCityEndpoint,
+								ResponseEntity<String> response = restTemplate.exchange(mobaasEndPoint,
 										HttpMethod.POST, requestEntity, String.class);
 
 								log.info("\nstatus code > " + response.getStatusCode());
-							}
-						} catch (IOException e) {
+							} catch (IOException e) {
 							log.error("[ERROR] compressing file > " + e.getMessage());
-						} finally {
-							try {
-								newFile.delete();
-								targzFile.delete();
-							}catch (NullPointerException e){
-								log.error("[ERROR] deleting file > " + e.getMessage());
+							} finally {
+								try {
+									newFile.delete();
+									targzFile.delete();
+								}catch (NullPointerException e){
+									log.error("[ERROR] deleting file > " + e.getMessage());
+								}
+								newFile = null;
+								targzFile = null;
 							}
-							newFile = null;
-							targzFile = null;
+						} else {
+							log.info("Actually, I won't send it because we sent it recentely...");
 						}
 
 					}
@@ -431,6 +450,7 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 				}
 			}
 		}
+		m=null;
 	}
 
 	/**
@@ -487,9 +507,14 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 					response = template.exchange(rs.getRouteAPI(), HttpMethod.POST, request,
 							String.class);
 				} catch (HttpClientErrorException e) {
-					log.error("Problem communicating with AIT Routing Engine!");
+					log.error("Problem communicating with AIT Routing Engine! (Client)");
 					e.printStackTrace();
 					return new GrcResponse();
+				} catch (HttpServerErrorException e) {
+					log.error("Problem communicating with AIT Routing Engine! (Server)");
+					e.printStackTrace();
+					return new GrcResponse();
+					
 				}
 
 				// Obtain url to obtain route
@@ -565,6 +590,9 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 					return resp;
 
 				} catch (IOException e) {
+					log.error("Problem communicating with MoBaaS Routing Service!" + e.getMessage() );
+					return new GrcResponse();
+				} catch (NullPointerException e) {
 					log.error("Problem communicating with MoBaaS Routing Service!" + e.getMessage() );
 					return new GrcResponse();
 				}
