@@ -493,6 +493,12 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	}
 	
 	private GrcResponse routeRequestConsumerVienna(GrcRequest r, RoutingService rs) {
+		GrcResponse requestNormal = aitRequest(r, rs, false);
+		GrcResponse requestEcological = aitRequest(r, rs, true);
+		return requestEcological;
+	}
+	
+	private GrcResponse aitRequest(GrcRequest r, RoutingService rs, boolean is_ecological) {
 		log.info("The route is for Vienna ---> Send it to AIT!");
 		// https://github.com/dts-ait/ariadne-json-route-format/blob/master/src/main/java/at/ac/ait/ariadne/routeformat/RoutingRequest.java
 		log.info("Building POST request");
@@ -523,7 +529,10 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 		// Put everything into model
 		rr.setFrom(locFrom);
 		rr.setTo(locTo);
-		rr.setOptimizedFor("AIR_QUALITY");  
+		if (is_ecological) 
+			rr.setOptimizedFor("AIR_QUALITY");
+		else
+			rr.setOptimizedFor("TRAVELTIME");
 		rr.setModesOfTransport(rmotList);
 
 		// Send Post request with parameters
@@ -581,17 +590,31 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	
 	
 	private GrcResponse routeRequestConsumerMoBaaS(GrcRequest r, RoutingService rs) {
+		GrcResponse requestNormal = requestFromMoBaaS(r, rs, false);
+		GrcResponse requestEcological = requestFromMoBaaS(r, rs, true);
+		return requestEcological;
+	}
+	
+	private GrcResponse requestFromMoBaaS(GrcRequest r, RoutingService rs, boolean is_ecological) {
 		log.info("The route is not for Vienna ---> Send it to MoBaaS!");
 		
 		String fromRequest = "" + r.getFrom().getLatitude() + "," + r.getFrom().getLongitude();
 		String toRequest = "" + r.getTo().getLatitude() + "," + r.getTo().getLongitude();
 		String modeRequest = "";
 		
-		if (r.getTransportationMode().equalsIgnoreCase("foot"))
-			modeRequest = "WALK";
-		else if (r.getTransportationMode().equalsIgnoreCase("bike") || r.getTransportationMode().equalsIgnoreCase("bicycle"))
-			modeRequest = "BICYCLE";
-		
+		if (is_ecological) {
+			if (r.getTransportationMode().equalsIgnoreCase("foot"))
+				modeRequest = "WALK";
+			else if (r.getTransportationMode().equalsIgnoreCase("bike") || r.getTransportationMode().equalsIgnoreCase("bicycle"))
+				modeRequest = "BICYCLE";
+		}
+		else {
+			if (r.getTransportationMode().equalsIgnoreCase("foot"))
+				modeRequest = "NOT_ECO_WALK";
+			else if (r.getTransportationMode().equalsIgnoreCase("bike") || r.getTransportationMode().equalsIgnoreCase("bicycle"))
+				modeRequest = "NOT_ECO_BIKE";
+		}
+				
 		
 		ServiceExecutionTaskResponse response = enablerLogic.invokeService(
 			new ServiceExecutionTaskInfo(
