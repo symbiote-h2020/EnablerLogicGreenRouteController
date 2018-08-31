@@ -465,139 +465,12 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	 */
 	private GrcResponse routeRequestConsumer(GrcRequest r) {
 		log.info("Received route request");
+		
 		for (RoutingService rs : this.registeredRoutingServices) {
 			if (isInVienna(r.getFrom())) {
-				log.info("The route is for Vienna ---> Send it to AIT!");
-				// https://github.com/dts-ait/ariadne-json-route-format/blob/master/src/main/java/at/ac/ait/ariadne/routeformat/RoutingRequest.java
-				log.info("Building POST request");
-				RoutingRequest rr = new RoutingRequest();
-
-				// Define locations
-				GeoJSONCoordinate gjcFrom = GeoJSONCoordinate.create(((WGS84Location) r.getFrom()).getLongitude(),
-						((WGS84Location) r.getFrom()).getLatitude(), ((WGS84Location) r.getFrom()).getAltitude());
-				GeoJSONCoordinate gjcTo = GeoJSONCoordinate.create(((WGS84Location) r.getTo()).getLongitude(),
-						((WGS84Location) r.getTo()).getLatitude(), ((WGS84Location) r.getTo()).getAltitude());
-				Location<?> locFrom = Location.createMinimal(gjcFrom);
-				Location<?> locTo = Location.createMinimal(gjcTo);
-				
-				ArrayList<RequestModeOfTransport<?>> rmotList = null;
-				// Define mode of transportation,
-				if (r.getTransportationMode().equalsIgnoreCase("foot")) {
-					ModeOfTransport mot = ModeOfTransport.createMinimal(GeneralizedModeOfTransportType.FOOT);
-					RequestModeOfTransport<?> rmot = RequestModeOfTransport.createMinimal(mot);
-					rmotList = new ArrayList<RequestModeOfTransport<?>>();
-					rmotList.add(rmot);
-				} else if (r.getTransportationMode().equalsIgnoreCase("bike") || r.getTransportationMode().equalsIgnoreCase("bicycle")) {
-					ModeOfTransport mot = ModeOfTransport.createMinimal(GeneralizedModeOfTransportType.BICYCLE);
-					RequestModeOfTransport<?> rmot = RequestModeOfTransport.createMinimal(mot);
-					rmotList = new ArrayList<RequestModeOfTransport<?>>();
-					rmotList.add(rmot);
-				}
-
-				// Put everything into model
-				rr.setFrom(locFrom);
-				rr.setTo(locTo);
-				rr.setOptimizedFor("AIR_QUALITY");  
-				rr.setModesOfTransport(rmotList);
-
-				// Send Post request with parameters
-				log.info("Sendind POST request to AIT!");
-				RestTemplate template = new RestTemplate();
-				HttpEntity<RoutingRequest> request = new HttpEntity<>(rr);
-				ResponseEntity<String> response = null;
-				
-				try {
-					response = template.exchange(rs.getRouteAPI(), HttpMethod.POST, request,
-							String.class);
-				} catch (HttpClientErrorException e) {
-					log.error("Problem communicating with AIT Routing Engine! (Client)");
-					e.printStackTrace();
-					return new GrcResponse();
-				} catch (HttpServerErrorException e) {
-					log.error("Problem communicating with AIT Routing Engine! (Server)");
-					e.printStackTrace();
-					return new GrcResponse();
-				}
-
-				// Obtain url to obtain route
-				HttpHeaders headers = response.getHeaders();
-				String getUrl = headers.getLocation().toString();
-
-				// Get request to obtain route
-				log.info("Sendind GET request to AIT!");
-				RoutingResponse routeResponse = template.getForObject(getUrl, RoutingResponse.class);
-
-				// Start extracting data from the response into our own model
-				RouteSegment route = routeResponse.getRoutes().get(0).getSegments().get(0);
-
-				List<GeoJSONCoordinate> coorList = route.getGeometryGeoJson().get().getGeometry().getCoordinates();
-				List<Waypoint> wayList = new ArrayList<Waypoint>();
-				for (GeoJSONCoordinate coor : coorList) {
-					Waypoint w = new Waypoint();
-					w.setLocation(new WGS84Location(coor.getX().doubleValue(), coor.getY().doubleValue(), 100, "",
-							new ArrayList<String>()));
-					wayList.add(w);
-				}
-
-				GrcResponse resp = new GrcResponse();
-				resp.setDistance(route.getDistanceMeters());
-				resp.setTravelTime(route.getDurationSeconds());
-				resp.setAirQualityRating(0);
-				resp.setRoute(wayList);
-				
-				String logGrcMessage = "GRC message: \nDistance: " + resp.getDistance() + "\nTravelTime: " + 
-						resp.getTravelTime() + "\nRouteSize: " + resp.getRoute().size();
-				
-				log.info(logGrcMessage);
-
-				return resp;
+				return routeRequestConsumerVienna(r, rs);
 			} else {
-				log.info("The route is not for Vienna ---> Send it to MoBaaS!");
-				// TODO send through rabbit
-				
-				String fromRequest = "" + r.getFrom().getLatitude() + "," + r.getFrom().getLongitude();
-				String toRequest = "" + r.getTo().getLatitude() + "," + r.getTo().getLongitude();
-				String modeRequest = "";
-				
-				if (r.getTransportationMode().equalsIgnoreCase("foot"))
-					modeRequest = "WALK";
-				else if (r.getTransportationMode().equalsIgnoreCase("bike") || r.getTransportationMode().equalsIgnoreCase("bicycle"))
-					modeRequest = "BICYCLE";
-				
-				
-				ServiceExecutionTaskResponse response = enablerLogic.invokeService(
-					new ServiceExecutionTaskInfo(
-						"routingServiceTask", routingServiceInfo, props.getEnablerName(), 
-						Arrays.asList(
-							new ServiceParameter("from", fromRequest),
-							new ServiceParameter("to", toRequest), 
-							new ServiceParameter("mode", modeRequest)
-						)
-					)
-				);
-
-//                             log.info(response.toString());
-
-
-
-				try {
-					ObjectMapper om = new ObjectMapper();
-					om.configure(JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES, true)
-					  .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-
-					GrcResponse resp = om.readValue(response.getOutput()
-							.replaceAll("=",":")
-							.replaceAll("longitude",    "@c:\".WGS84Location\", longitude")
-							, new TypeReference<GrcResponse>(){});
-					return resp;
-
-				} catch (IOException e) {
-					log.error("Problem communicating with MoBaaS Routing Service!" + e.getMessage() );
-					return new GrcResponse();
-				} catch (NullPointerException e) {
-					log.error("Problem communicating with MoBaaS Routing Service!" + e.getMessage() );
-					return new GrcResponse();
-				}
+				return routeRequestConsumerMoBaaS(r, rs);
 			}
 		}
 		
@@ -617,6 +490,138 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 			return true;
 		else 
 			return false;
+	}
+	
+	private GrcResponse routeRequestConsumerVienna(GrcRequest r, RoutingService rs) {
+		log.info("The route is for Vienna ---> Send it to AIT!");
+		// https://github.com/dts-ait/ariadne-json-route-format/blob/master/src/main/java/at/ac/ait/ariadne/routeformat/RoutingRequest.java
+		log.info("Building POST request");
+		RoutingRequest rr = new RoutingRequest();
+
+		// Define locations
+		GeoJSONCoordinate gjcFrom = GeoJSONCoordinate.create(((WGS84Location) r.getFrom()).getLongitude(),
+				((WGS84Location) r.getFrom()).getLatitude(), ((WGS84Location) r.getFrom()).getAltitude());
+		GeoJSONCoordinate gjcTo = GeoJSONCoordinate.create(((WGS84Location) r.getTo()).getLongitude(),
+				((WGS84Location) r.getTo()).getLatitude(), ((WGS84Location) r.getTo()).getAltitude());
+		Location<?> locFrom = Location.createMinimal(gjcFrom);
+		Location<?> locTo = Location.createMinimal(gjcTo);
+		
+		ArrayList<RequestModeOfTransport<?>> rmotList = null;
+		// Define mode of transportation,
+		if (r.getTransportationMode().equalsIgnoreCase("foot")) {
+			ModeOfTransport mot = ModeOfTransport.createMinimal(GeneralizedModeOfTransportType.FOOT);
+			RequestModeOfTransport<?> rmot = RequestModeOfTransport.createMinimal(mot);
+			rmotList = new ArrayList<RequestModeOfTransport<?>>();
+			rmotList.add(rmot);
+		} else if (r.getTransportationMode().equalsIgnoreCase("bike") || r.getTransportationMode().equalsIgnoreCase("bicycle")) {
+			ModeOfTransport mot = ModeOfTransport.createMinimal(GeneralizedModeOfTransportType.BICYCLE);
+			RequestModeOfTransport<?> rmot = RequestModeOfTransport.createMinimal(mot);
+			rmotList = new ArrayList<RequestModeOfTransport<?>>();
+			rmotList.add(rmot);
+		}
+
+		// Put everything into model
+		rr.setFrom(locFrom);
+		rr.setTo(locTo);
+		rr.setOptimizedFor("AIR_QUALITY");  
+		rr.setModesOfTransport(rmotList);
+
+		// Send Post request with parameters
+		log.info("Sendind POST request to AIT!");
+		RestTemplate template = new RestTemplate();
+		HttpEntity<RoutingRequest> request = new HttpEntity<>(rr);
+		ResponseEntity<String> response = null;
+		
+		try {
+			response = template.exchange(rs.getRouteAPI(), HttpMethod.POST, request,
+					String.class);
+		} catch (HttpClientErrorException e) {
+			log.error("Problem communicating with AIT Routing Engine! (Client)");
+			e.printStackTrace();
+			return new GrcResponse();
+		} catch (HttpServerErrorException e) {
+			log.error("Problem communicating with AIT Routing Engine! (Server)");
+			e.printStackTrace();
+			return new GrcResponse();
+		}
+
+		// Obtain url to obtain route
+		HttpHeaders headers = response.getHeaders();
+		String getUrl = headers.getLocation().toString();
+
+		// Get request to obtain route
+		log.info("Sendind GET request to AIT!");
+		RoutingResponse routeResponse = template.getForObject(getUrl, RoutingResponse.class);
+
+		// Start extracting data from the response into our own model
+		RouteSegment route = routeResponse.getRoutes().get(0).getSegments().get(0);
+
+		List<GeoJSONCoordinate> coorList = route.getGeometryGeoJson().get().getGeometry().getCoordinates();
+		List<Waypoint> wayList = new ArrayList<Waypoint>();
+		for (GeoJSONCoordinate coor : coorList) {
+			Waypoint w = new Waypoint();
+			w.setLocation(new WGS84Location(coor.getX().doubleValue(), coor.getY().doubleValue(), 100, "",
+					new ArrayList<String>()));
+			wayList.add(w);
+		}
+
+		GrcResponse resp = new GrcResponse();
+		resp.setDistance(route.getDistanceMeters());
+		resp.setTravelTime(route.getDurationSeconds());
+		resp.setAirQualityRating(0);
+		resp.setRoute(wayList);
+		
+		String logGrcMessage = "GRC message: \nDistance: " + resp.getDistance() + "\nTravelTime: " + 
+				resp.getTravelTime() + "\nRouteSize: " + resp.getRoute().size();
+		
+		log.info(logGrcMessage);
+
+		return resp;
+	}
+	
+	
+	private GrcResponse routeRequestConsumerMoBaaS(GrcRequest r, RoutingService rs) {
+		log.info("The route is not for Vienna ---> Send it to MoBaaS!");
+		
+		String fromRequest = "" + r.getFrom().getLatitude() + "," + r.getFrom().getLongitude();
+		String toRequest = "" + r.getTo().getLatitude() + "," + r.getTo().getLongitude();
+		String modeRequest = "";
+		
+		if (r.getTransportationMode().equalsIgnoreCase("foot"))
+			modeRequest = "WALK";
+		else if (r.getTransportationMode().equalsIgnoreCase("bike") || r.getTransportationMode().equalsIgnoreCase("bicycle"))
+			modeRequest = "BICYCLE";
+		
+		
+		ServiceExecutionTaskResponse response = enablerLogic.invokeService(
+			new ServiceExecutionTaskInfo(
+				"routingServiceTask", routingServiceInfo, props.getEnablerName(), 
+				Arrays.asList(
+					new ServiceParameter("from", fromRequest),
+					new ServiceParameter("to", toRequest), 
+					new ServiceParameter("mode", modeRequest)
+				)
+			)
+		);
+
+		try {
+			ObjectMapper om = new ObjectMapper();
+			om.configure(JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES, true)
+			  .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+			GrcResponse resp = om.readValue(response.getOutput()
+					.replaceAll("=",":")
+					.replaceAll("longitude",    "@c:\".WGS84Location\", longitude")
+					, new TypeReference<GrcResponse>(){});
+			return resp;
+
+		} catch (IOException e) {
+			log.error("Problem communicating with MoBaaS Routing Service!" + e.getMessage() );
+			return new GrcResponse();
+		} catch (NullPointerException e) {
+			log.error("Problem communicating with MoBaaS Routing Service!" + e.getMessage() );
+			return new GrcResponse();
+		}
 	}
 
 }
