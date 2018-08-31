@@ -34,8 +34,13 @@ public class Utils {
 
     }
 
-    public static File targzCompress(File zipMe) throws IOException {
-        File outFile = new File(zipMe.getName().replace(".json","") + ".tar.gz");
+    public static File targzCompress(File zipMe, String path) throws IOException {
+    		File outFile = null;
+    		if (path==null) {
+    	        outFile = new File(zipMe.getName().replace(".json","") + ".tar.gz");
+    		} else {
+    			outFile = new File(path);
+    		}
         List<File> list = new ArrayList<>();
         list.add(zipMe);
         compressFiles(list, outFile);

@@ -310,6 +310,9 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	 * Method to store route communications 
 	 */
 	private GrcResponse routeCommunicationUpdatesConsumer(RouteCommunication rc) {
+		if(rc.getRouteId()==946311108) {
+			return null;
+		}
 		log.info("Received point:\nId: " + rc.getRouteId() + "\n" + rc.getLocation() + "\nTimestamp: " + rc.getTimestamp());
 
 		routeRepo.save(new RoutePoint(rc));
@@ -317,43 +320,6 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 		return null;
 	}
 
-	
-	/**
-	 * Method to obtain air quality data from interpolator
-	 */
-	private void requestAirQualityData() {
-		for (Region region : this.registeredRegions) {
-			log.info("Requesting data from " + region.getName());
-			QueryInterpolatedStreetSegmentList interpolatedRequest = new QueryInterpolatedStreetSegmentList();
-			interpolatedRequest.sslID = region.getName();
-			QueryInterpolatedStreetSegmentListResponse response = enablerLogic.sendSyncMessageToEnablerLogic(
-					"EnablerLogicInterpolator", interpolatedRequest, QueryInterpolatedStreetSegmentListResponse.class);
-
-			log.info("Received data from " + region.getName());
-			try {
-				for (RoutingService rs : this.registeredRoutingServices) {
-					for (Region serviceRegion : rs.getLocations()) {
-						if (serviceRegion.getName().equals(region.getName())) {
-							if (rs.isExternal()) {
-								log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to "
-										+ rs.getName() + " through REST");
-								// TODO send street segments and qir quality to service (REST)
-								
-								
-							} else {
-								log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to "
-										+ rs.getName() + " through Rabbit");
-								// TODO send street segments and qir quality to PP (Rabbit)
-							}
-							break;
-						}
-					}
-				}
-			} catch (NullPointerException e) {
-				log.error("Got no data from Interpolator!");
-			}
-		}
-	}
 
 	/**
 	 * Consumes air quality data updates and sends them to whoever wants it
@@ -371,6 +337,7 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 		log.info("Storing to file data from " + m.regionID);
 		ObjectMapper mapper = new ObjectMapper();
 
+		//File newFile = new File("/home/student/SMEUR/routingData/streetSegments" + m.regionID + ".json");
 		File newFile = new File("streetSegments" + m.regionID + ".json");
 
 		try {
@@ -389,14 +356,50 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 			for (Region serviceRegion : rs.getLocations()) {
 				if (serviceRegion.getName().equals(m.regionID)) {
 					if (rs.isExternal()) {
-						log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to " + rs.getName()
-								+ " through REST");
-						// log.info(m.theList.toString());
+						log.info("Storing Air Quality Updates from " + serviceRegion.getName() + " to " + rs.getName());
+						
 						try {
 							log.info("The size of the received data is " + m.theList.size());
 						} catch (NullPointerException e) {
 							log.error("Received a null update!");
 						}
+						
+
+						File inteprolatedFile = new File("/home/student/SMEUR/routingData/interpolated.json"); 
+						try {
+							mapper.writeValue(inteprolatedFile, m.theList);
+						} catch (JsonGenerationException e) {
+							e.printStackTrace();
+						} catch (JsonMappingException e) {
+							e.printStackTrace();
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+						
+						
+						File targzFile = null;
+						try {
+							lastRun = System.currentTimeMillis();
+							log.info("\nVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV\njson file > "
+									+ inteprolatedFile.getAbsolutePath()
+									+ "\nVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV\n");
+
+							targzFile = Utils.targzCompress(newFile, "/home/student/SMEUR/routingData/interpolated.tar.gz");
+
+							log.info("\nVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV\ntar gz file > "
+									+ targzFile.getAbsolutePath()
+									+ "\nVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV\n");
+
+						} catch (IOException e) {
+						log.error("[ERROR] compressing file > " + e.getMessage());
+						} finally {
+							try {
+								newFile.delete();
+							}catch (NullPointerException e){
+								log.error("[ERROR] deleting file > " + e.getMessage());
+							}
+							newFile = null;
+						} 
 						
 						// TODO send through rest
 					} else {
@@ -407,15 +410,15 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 						log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to " + rs.getName());
 						try {
 								lastRun = System.currentTimeMillis();
-								log.info("\n#########################################\njson file > "
+								log.info("\nZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ\njson file > "
 										+ newFile.getAbsolutePath()
-										+ "\n#########################################\n");
+										+ "\nZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ\n");
 
-								targzFile = Utils.targzCompress(newFile);
+								targzFile = Utils.targzCompress(newFile, null);
 
-								log.info("\n#########################################\ntar gz file > "
+								log.info("\nZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ\ntar gz file > "
 										+ targzFile.getAbsolutePath()
-										+ "\n#########################################\n");
+										+ "\nZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ\n");
 
 								// send file
 								MultiValueMap<String, Object> bodyMap = new LinkedMultiValueMap<>();
@@ -494,7 +497,7 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 				// Put everything into model
 				rr.setFrom(locFrom);
 				rr.setTo(locTo);
-				rr.setOptimizedFor("TRAVELTIME");  // TODO check if better option
+				rr.setOptimizedFor("AIR_QUALITY");  
 				rr.setModesOfTransport(rmotList);
 
 				// Send Post request with parameters
@@ -514,7 +517,6 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 					log.error("Problem communicating with AIT Routing Engine! (Server)");
 					e.printStackTrace();
 					return new GrcResponse();
-					
 				}
 
 				// Obtain url to obtain route
