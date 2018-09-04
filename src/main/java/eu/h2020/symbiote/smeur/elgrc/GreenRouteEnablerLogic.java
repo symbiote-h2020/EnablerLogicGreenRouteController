@@ -613,6 +613,7 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 		resp.setTravelTime(route.getDurationSeconds());
 		resp.setAirQualityRating(0);
 		resp.setRoute(wayList);
+		resp.setEco(is_ecological);
 		
 		String logGrcMessage = "GRC message: \nDistance: " + resp.getDistance() + "\nTravelTime: " + 
 				resp.getTravelTime() + "\nRouteSize: " + resp.getRoute().size();
@@ -685,6 +686,7 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 					.replaceAll("=",":")
 					.replaceAll("longitude",    "@c:\".WGS84Location\", longitude")
 					, new TypeReference<GrcResponse>(){});
+			resp.setEco(is_ecological);
 			return resp;
 
 		} catch (IOException e) {
