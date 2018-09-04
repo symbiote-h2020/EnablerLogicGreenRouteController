@@ -463,7 +463,7 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	 * @param r
 	 * @return
 	 */
-	private GrcResponse routeRequestConsumer(GrcRequest r) {
+	private List<GrcResponse> routeRequestConsumer(GrcRequest r) {
 		log.info("Received route request");
 		
 		for (RoutingService rs : this.registeredRoutingServices) {
@@ -474,15 +474,33 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 			}
 		}
 		
-		GrcResponse dummyResponse = new GrcResponse();
-		dummyResponse.setAirQualityRating(1.0);
-		dummyResponse.setDistance(1.0);
-		dummyResponse.setTravelTime(1.0);
-		dummyResponse.setRoute(new ArrayList<Waypoint>());
-		return dummyResponse;
+		ArrayList<GrcResponse> routeList = new ArrayList<GrcResponse>();
+		GrcResponse dummyResponse1 = new GrcResponse();
+		dummyResponse1.setAirQualityRating(1.0);
+		dummyResponse1.setDistance(1.0);
+		dummyResponse1.setTravelTime(1.0);
+		dummyResponse1.setRoute(new ArrayList<Waypoint>());
+		dummyResponse1.setEco(false);
+		
+		GrcResponse dummyResponse2 = new GrcResponse();
+		dummyResponse2.setAirQualityRating(1.0);
+		dummyResponse2.setDistance(1.0);
+		dummyResponse2.setTravelTime(1.0);
+		dummyResponse2.setRoute(new ArrayList<Waypoint>());
+		dummyResponse1.setEco(true);
+		
+		routeList.add(dummyResponse1);
+		routeList.add(dummyResponse2);
+		
+		return routeList;
 	}
 	
-	
+	/**
+	 * Method to check if request is in Vienna or not
+	 * 
+	 * @param loc
+	 * @return
+	 */
 	private boolean isInVienna(WGS84Location loc) {
 		double lat = loc.getLatitude();
 		double lon = loc.getLongitude();
@@ -492,12 +510,28 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 			return false;
 	}
 	
-	private GrcResponse routeRequestConsumerVienna(GrcRequest r, RoutingService rs) {
-		GrcResponse requestNormal = aitRequest(r, rs, false);
-		GrcResponse requestEcological = aitRequest(r, rs, true);
-		return requestEcological;
+	/**
+	 * Method to request routes for Vienna
+	 * 
+	 * @param r
+	 * @param rs
+	 * @return
+	 */
+	private List<GrcResponse> routeRequestConsumerVienna(GrcRequest r, RoutingService rs) {
+		ArrayList<GrcResponse> routeList = new ArrayList<GrcResponse>();
+		routeList.add(aitRequest(r, rs, false));
+		routeList.add(aitRequest(r, rs, true));
+		return routeList;
 	}
 	
+	/**
+	 * Method to request route for Vienna routing engine
+	 * 
+	 * @param r
+	 * @param rs
+	 * @param is_ecological
+	 * @return
+	 */
 	private GrcResponse aitRequest(GrcRequest r, RoutingService rs, boolean is_ecological) {
 		log.info("The route is for Vienna ---> Send it to AIT!");
 		// https://github.com/dts-ait/ariadne-json-route-format/blob/master/src/main/java/at/ac/ait/ariadne/routeformat/RoutingRequest.java
@@ -588,13 +622,28 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 		return resp;
 	}
 	
-	
-	private GrcResponse routeRequestConsumerMoBaaS(GrcRequest r, RoutingService rs) {
-		GrcResponse requestNormal = requestFromMoBaaS(r, rs, false);
-		GrcResponse requestEcological = requestFromMoBaaS(r, rs, true);
-		return requestEcological;
+	/**
+	 * Method to request routes for not Vienna
+	 * 
+	 * @param r
+	 * @param rs
+	 * @return
+	 */
+	private List<GrcResponse> routeRequestConsumerMoBaaS(GrcRequest r, RoutingService rs) {
+		ArrayList<GrcResponse> routeList = new ArrayList<GrcResponse>();
+		routeList.add(requestFromMoBaaS(r, rs, false));
+		routeList.add(requestFromMoBaaS(r, rs, true));
+		return routeList;
 	}
 	
+	/**
+	 * Method to request routes from MoBaaS routing engine
+	 * 
+	 * @param r
+	 * @param rs
+	 * @param is_ecological
+	 * @return
+	 */
 	private GrcResponse requestFromMoBaaS(GrcRequest r, RoutingService rs, boolean is_ecological) {
 		log.info("The route is not for Vienna ---> Send it to MoBaaS!");
 		
