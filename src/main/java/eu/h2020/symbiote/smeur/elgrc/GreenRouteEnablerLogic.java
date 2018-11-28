@@ -423,6 +423,7 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 								// send file
 								MultiValueMap<String, Object> bodyMap = new LinkedMultiValueMap<>();
 								bodyMap.add("file", new FileSystemResource(targzFile));
+								bodyMap.add("city", serviceRegion.getName());
 								HttpHeaders headers = new HttpHeaders();
 								headers.setContentType(MediaType.MULTIPART_FORM_DATA);
 								HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(bodyMap, headers);
