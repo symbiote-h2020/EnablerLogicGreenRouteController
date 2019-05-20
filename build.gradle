@@ -55,6 +55,7 @@ dependencyManagement {
 configurations.all {
     // check for updates every build
     resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
+    exclude module: 'slf4j-log4j12'
 }
 
 dependencies {

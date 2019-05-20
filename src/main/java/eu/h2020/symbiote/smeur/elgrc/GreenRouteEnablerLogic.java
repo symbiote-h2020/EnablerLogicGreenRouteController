@@ -104,7 +104,8 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 	@Value("${httpEndpoint.mobaas}")
 	String mobaasEndPoint;
 
-	long lastRun=0 ;
+	long lastRun=0;
+	String lastRunCity="";
 
 
 	@Override
@@ -405,11 +406,14 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 					} else {
 
 						long tenMinAgo = System.currentTimeMillis() - Constants.TEN_MINUTES;
+						long twentyMinAgo = System.currentTimeMillis() - Constants.TWENTY_MINUTES;
+						// if (lastRun == 0 || (lastRun <= tenMinAgo && lastRunCity.compareTo(serviceRegion.getName()) != 0 ) || lastRun <= twentyMinAgo) {
 						if (lastRun == 0 || lastRun <= tenMinAgo) {
 						File targzFile = null;
 						log.info("Sending Air Quality Updates from " + serviceRegion.getName() + " to " + rs.getName());
 						try {
 								lastRun = System.currentTimeMillis();
+								lastRunCity = serviceRegion.getName();
 								log.info("\nZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ\njson file > "
 										+ newFile.getAbsolutePath()
 										+ "\nZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ\n");
@@ -438,7 +442,7 @@ public class GreenRouteEnablerLogic implements ProcessingLogic {
 							} finally {
 								try {
 									newFile.delete();
-									targzFile.delete();
+									//targzFile.delete();
 								}catch (NullPointerException e){
 									log.error("[ERROR] deleting file > " + e.getMessage());
 								}
